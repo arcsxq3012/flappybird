@@ -170,6 +170,32 @@ button{
   overflow:hidden;
 }
 
+/* Slot opening flap */
+.boothSlot::before{
+  content:"";
+  position:absolute;
+  left:14px;
+  right:14px;
+  top:16px;
+  height:18px;
+  background:rgba(0,0,0,.12);
+  border-radius:12px;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35);
+  z-index:3;
+  transform:scaleY(1);
+  transform-origin:center;
+  opacity:1;
+}
+
+.boothSlot.open::before{
+  animation:slotOpen .55s ease-out forwards;
+}
+
+@keyframes slotOpen{
+  0%{ transform:scaleY(1); opacity:1; }
+  100%{ transform:scaleY(.25); opacity:.55; }
+}
+
 #boothStrip{
   position:absolute;
   left:50%;
@@ -177,19 +203,64 @@ button{
   transform:translateX(-50%);
   width:220px;
   border-radius:12px;
-  box-shadow:0 18px 50px rgba(0,0,0,.25);
   opacity:0;
+  z-index:2;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,.10),
+    0 22px 55px rgba(0,0,0,.10);
 }
 
+/* 3.2s print */
 .boothPrint{
-  animation:boothPrint 1.6s cubic-bezier(.2,.9,.25,1) forwards;
+  animation:boothPrint 3.2s cubic-bezier(.18,.85,.25,1) forwards;
 }
 
+/* shadow grows while printing */
 @keyframes boothPrint{
-  0%{ top:-120%; opacity:0; transform:translateX(-50%) scale(.96); }
-  40%{ opacity:1; }
-  80%{ top:12%; transform:translateX(-50%) scale(1.02); }
-  100%{ top:18%; transform:translateX(-50%) scale(1); opacity:1; }
+  0%{
+    top:-120%;
+    opacity:0;
+    transform:translateX(-50%) scale(.96);
+    box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0);
+  }
+  20%{
+    opacity:1;
+  }
+  70%{
+    top:12%;
+    transform:translateX(-50%) scale(1.01);
+    box-shadow:
+      0 10px 24px rgba(0,0,0,.12),
+      0 30px 70px rgba(0,0,0,.16);
+  }
+  88%{
+    top:18%;
+    transform:translateX(-50%) scale(.995);
+    box-shadow:
+      0 14px 30px rgba(0,0,0,.14),
+      0 36px 86px rgba(0,0,0,.20);
+  }
+  100%{
+    top:18%;
+    opacity:1;
+    transform:translateX(-50%) scale(1);
+    box-shadow:
+      0 12px 28px rgba(0,0,0,.14),
+      0 34px 82px rgba(0,0,0,.20);
+  }
+}
+
+/* shake after print */
+.boothPrintDone{
+  animation:polaroidShake .55s ease-in-out 1;
+}
+
+@keyframes polaroidShake{
+  0%{ transform:translateX(-50%) translateY(0) rotate(0deg); }
+  18%{ transform:translateX(-50%) translateY(-2px) rotate(-1.2deg); }
+  38%{ transform:translateX(-50%) translateY(1px) rotate(1.1deg); }
+  60%{ transform:translateX(-50%) translateY(-1px) rotate(-0.8deg); }
+  100%{ transform:translateX(-50%) translateY(0) rotate(0deg); }
 }
 
 .boothActions{
@@ -299,6 +370,7 @@ const btnNo = document.getElementById("btnNo");
 const btnReplay = document.getElementById("btnReplay");
 
 const booth = document.getElementById("booth");
+const boothSlot = booth.querySelector(".boothSlot");
 const boothStrip = document.getElementById("boothStrip");
 const btnSavePhoto = document.getElementById("btnSavePhoto");
 const btnShareIG = document.getElementById("btnShareIG");
@@ -456,7 +528,8 @@ function setAskButtonsDefault(){
 
 function hideBoothAll(){
   booth.style.display = "none";
-  boothStrip.classList.remove("boothPrint");
+  boothSlot.classList.remove("open");
+  boothStrip.classList.remove("boothPrint","boothPrintDone");
   boothMsg.textContent = "";
   boothMsg.classList.remove("show");
   shareHint.style.display = "none";
@@ -587,9 +660,17 @@ function setAskStep2(){
 
 function runPhotoBooth(){
   booth.style.display = "";
-  boothStrip.classList.remove("boothPrint");
+  boothSlot.classList.remove("open");
+  boothStrip.classList.remove("boothPrint","boothPrintDone");
+
   void boothStrip.offsetWidth;
+
+  boothSlot.classList.add("open");
   boothStrip.classList.add("boothPrint");
+
+  setTimeout(() => {
+    boothStrip.classList.add("boothPrintDone");
+  }, 3350);
 }
 
 function showBoothMessage(){
@@ -709,7 +790,7 @@ function showOverlay(type){
         btnSavePhoto.style.display = "";
         btnShareIG.style.display = "";
         showBoothMessage();
-      }, 1700);
+      }, 3300);
     });
 
     return;
