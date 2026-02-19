@@ -196,71 +196,69 @@ button{
   100%{ transform:scaleY(.25); opacity:.55; }
 }
 
-#boothStrip{
+/* Wrapper controls motion + final scale */
+.boothWrap{
   position:absolute;
   left:50%;
-  top:-120%;
-  transform:translateX(-50%);
+  top:18%;
   width:220px;
-  border-radius:12px;
-  opacity:0;
+  transform:translateX(-50%) translateY(0) scale(1);
+  opacity:1;
   z-index:2;
+  transition:transform .45s ease;
+}
+
+/* Image stays visible after animations */
+#boothStrip{
+  width:100%;
+  height:auto;
+  display:block;
+  border-radius:12px;
   box-shadow:
     0 6px 18px rgba(0,0,0,.10),
     0 22px 55px rgba(0,0,0,.10);
 }
 
 /* 3.2s print */
-.boothPrint{
+.boothWrap.boothPrint{
   animation:boothPrint 3.2s cubic-bezier(.18,.85,.25,1) forwards;
 }
 
-/* shadow grows while printing */
+/* shadow growth happens from the image shadow + scale feel */
 @keyframes boothPrint{
   0%{
-    top:-120%;
+    transform:translateX(-50%) translateY(-140%) scale(.96);
     opacity:0;
-    transform:translateX(-50%) scale(.96);
-    box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0);
   }
-  20%{
-    opacity:1;
-  }
+  20%{ opacity:1; }
   70%{
-    top:12%;
-    transform:translateX(-50%) scale(1.01);
-    box-shadow:
-      0 10px 24px rgba(0,0,0,.12),
-      0 30px 70px rgba(0,0,0,.16);
+    transform:translateX(-50%) translateY(-8%) scale(1.01);
   }
   88%{
-    top:18%;
-    transform:translateX(-50%) scale(.995);
-    box-shadow:
-      0 14px 30px rgba(0,0,0,.14),
-      0 36px 86px rgba(0,0,0,.20);
+    transform:translateX(-50%) translateY(0) scale(.995);
   }
   100%{
-    top:18%;
+    transform:translateX(-50%) translateY(0) scale(1);
     opacity:1;
-    transform:translateX(-50%) scale(1);
-    box-shadow:
-      0 12px 28px rgba(0,0,0,.14),
-      0 34px 82px rgba(0,0,0,.20);
   }
 }
 
 /* shake after print */
-.boothPrintDone{
+.boothWrap.boothShake{
   animation:polaroidShake .55s ease-in-out 1;
 }
 
 @keyframes polaroidShake{
-  0%{ transform:translateX(-50%) translateY(0) rotate(0deg); }
-  18%{ transform:translateX(-50%) translateY(-2px) rotate(-1.2deg); }
-  38%{ transform:translateX(-50%) translateY(1px) rotate(1.1deg); }
-  60%{ transform:translateX(-50%) translateY(-1px) rotate(-0.8deg); }
-  100%{ transform:translateX(-50%) translateY(0) rotate(0deg); }
+  0%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
+  18%{ transform:translateX(-50%) translateY(-2px) rotate(-1.2deg) scale(1); }
+  38%{ transform:translateX(-50%) translateY(1px) rotate(1.1deg) scale(1); }
+  60%{ transform:translateX(-50%) translateY(-1px) rotate(-0.8deg) scale(1); }
+  100%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
+}
+
+/* final: smaller so full strip fits in booth */
+.boothWrap.boothFinal{
+  transform:translateX(-50%) translateY(0) scale(.78);
 }
 
 .boothActions{
@@ -326,7 +324,9 @@ button{
 
     <div id="booth" style="display:none;margin-top:14px;">
       <div class="boothSlot">
-        <img id="boothStrip" src="assets/photobooth.png" alt="">
+        <div id="boothWrap" class="boothWrap">
+          <img id="boothStrip" src="assets/photobooth.png" alt="">
+        </div>
       </div>
 
       <div class="boothActions">
@@ -371,6 +371,7 @@ const btnReplay = document.getElementById("btnReplay");
 
 const booth = document.getElementById("booth");
 const boothSlot = booth.querySelector(".boothSlot");
+const boothWrap = document.getElementById("boothWrap");
 const boothStrip = document.getElementById("boothStrip");
 const btnSavePhoto = document.getElementById("btnSavePhoto");
 const btnShareIG = document.getElementById("btnShareIG");
@@ -529,7 +530,7 @@ function setAskButtonsDefault(){
 function hideBoothAll(){
   booth.style.display = "none";
   boothSlot.classList.remove("open");
-  boothStrip.classList.remove("boothPrint","boothPrintDone");
+  boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
   boothMsg.textContent = "";
   boothMsg.classList.remove("show");
   shareHint.style.display = "none";
@@ -660,17 +661,23 @@ function setAskStep2(){
 
 function runPhotoBooth(){
   booth.style.display = "";
-  boothSlot.classList.remove("open");
-  boothStrip.classList.remove("boothPrint","boothPrintDone");
 
-  void boothStrip.offsetWidth;
+  boothSlot.classList.remove("open");
+  boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
+
+  void boothWrap.offsetWidth;
 
   boothSlot.classList.add("open");
-  boothStrip.classList.add("boothPrint");
+  boothWrap.classList.add("boothPrint");
 
   setTimeout(() => {
-    boothStrip.classList.add("boothPrintDone");
-  }, 3350);
+    boothWrap.classList.remove("boothPrint");
+    boothWrap.classList.add("boothShake");
+  }, 3200);
+
+  setTimeout(() => {
+    boothWrap.classList.add("boothFinal");
+  }, 3800);
 }
 
 function showBoothMessage(){
@@ -790,7 +797,7 @@ function showOverlay(type){
         btnSavePhoto.style.display = "";
         btnShareIG.style.display = "";
         showBoothMessage();
-      }, 3300);
+      }, 3900);
     });
 
     return;
