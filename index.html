@@ -200,7 +200,7 @@ button{
 .boothWrap{
   position:absolute;
   left:50%;
-  top:18%;
+  top:0;
   width:220px;
   transform:translateX(-50%) translateY(0) scale(1);
   opacity:1;
@@ -224,7 +224,6 @@ button{
   animation:boothPrint 3.2s cubic-bezier(.18,.85,.25,1) forwards;
 }
 
-/* shadow growth happens from the image shadow + scale feel */
 @keyframes boothPrint{
   0%{
     transform:translateX(-50%) translateY(-140%) scale(.96);
@@ -256,7 +255,7 @@ button{
   100%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
 }
 
-/* final: smaller so full strip fits in booth */
+/* final: smaller so full strip fits in booth (overridden by JS) */
 .boothWrap.boothFinal{
   transform:translateX(-50%) translateY(0) scale(.78);
 }
@@ -531,6 +530,8 @@ function hideBoothAll(){
   booth.style.display = "none";
   boothSlot.classList.remove("open");
   boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
+  boothWrap.style.width = "220px";
+  boothWrap.style.top = "0px";
   boothMsg.textContent = "";
   boothMsg.classList.remove("show");
   shareHint.style.display = "none";
@@ -659,11 +660,39 @@ function setAskStep2(){
   btnYes.className = "yesGreen btnMega";
 }
 
+/* Fit strip inside booth */
+function sizeStripToFitBooth(){
+  if (!boothStrip.naturalWidth || !boothStrip.naturalHeight) return;
+
+  const slotW = boothSlot.clientWidth;
+  const slotH = boothSlot.clientHeight;
+
+  const padX = 18;
+  const padTop = 46;
+  const padBottom = 18;
+
+  const availW = Math.max(80, slotW - padX * 2);
+  const availH = Math.max(80, slotH - padTop - padBottom);
+
+  const aspect = boothStrip.naturalHeight / boothStrip.naturalWidth;
+
+  let w = Math.min(220, availW, availH / aspect);
+  w = Math.max(140, w);
+
+  const h = w * aspect;
+
+  boothWrap.style.width = w + "px";
+  const topPx = Math.max(padTop, Math.round((slotH - h) / 2));
+  boothWrap.style.top = topPx + "px";
+}
+
 function runPhotoBooth(){
   booth.style.display = "";
 
   boothSlot.classList.remove("open");
   boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
+
+  sizeStripToFitBooth();
 
   void boothWrap.offsetWidth;
 
@@ -1031,6 +1060,14 @@ async function boot(){
     await document.fonts.load('16px "Arcade"');
     await document.fonts.load('44px "Arcade"');
   }
+
+  boothStrip.addEventListener("load", () => {
+    if (booth.style.display !== "none") sizeStripToFitBooth();
+  });
+
+  window.addEventListener("resize", () => {
+    if (booth.style.display !== "none") sizeStripToFitBooth();
+  });
 
   resetToStart();
   loop();
