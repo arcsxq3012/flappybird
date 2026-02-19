@@ -12,41 +12,16 @@
      font-display: swap;
    }
    :root { color-scheme: light; }
-   html, body {
-     height: 100%;
-     margin: 0;
-     background:#ffb7c9;
+   html, body { height: 100%; margin: 0; background:#ffb7c9; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+   .wrap { height: 100%; display:flex; align-items:center; justify-content:center; padding: 10px; box-sizing: border-box; }
+   canvas { width: min(96vw, 420px); height: auto; border-radius: 16px; background:#ffb7c9; box-shadow: 0 16px 60px rgba(0,0,0,.28); touch-action: manipulation; }
+   /* Pop up boxes stay system font */
+   .overlay{
+     position: fixed; inset: 0; display:none; align-items:center; justify-content:center;
+     background: rgba(0,0,0,.45); padding: 18px; overflow: hidden;
      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
    }
-   .wrap {
-     height: 100%;
-     display:flex;
-     align-items:center;
-     justify-content:center;
-     padding: 10px;
-     box-sizing: border-box;
-   }
-   canvas {
-     width: min(96vw, 420px);
-     height: auto;
-     border-radius: 16px;
-     background:#ffb7c9;
-     box-shadow: 0 16px 60px rgba(0,0,0,.28);
-     touch-action: manipulation;
-   }
-   /* Pop up boxes keep system font */
-   .overlay {
-     position: fixed;
-     inset: 0;
-     display:none;
-     align-items:center;
-     justify-content:center;
-     background: rgba(0,0,0,.45);
-     padding: 18px;
-     overflow: hidden;
-     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-   }
-   .card {
+   .card{
      width: min(92vw, 420px);
      background: rgba(255,255,255,.92);
      border: 2px solid rgba(0,0,0,.18);
@@ -59,46 +34,19 @@
      z-index: 2;
      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
    }
-   .title {
-     font-size: 18px;
-     font-weight: 900;
-     margin: 0 0 8px;
-     color: #111;
-   }
-   .title.wonGreen { color: #34c759; }
-   .text  {
-     margin: 0 0 12px;
-     color: rgba(0,0,0,.88);
-     line-height: 1.2;
-     font-weight: 900;
-     font-size: 20px;
-   }
-   .row {
-     display:flex;
-     gap: 10px;
-     justify-content:center;
-     flex-wrap: wrap;
-   }
-   button {
-     appearance:none;
-     border: 0;
-     border-radius: 12px;
-     padding: 12px 14px;
-     font-weight: 900;
-     cursor: pointer;
-     min-width: 120px;
+   .title{ font-size: 18px; font-weight: 900; margin: 0 0 8px; color:#111; }
+   .title.wonGreen{ color:#34c759; }
+   .text{ margin: 0 0 12px; color: rgba(0,0,0,.88); line-height: 1.2; font-weight: 900; font-size: 20px; }
+   .row{ display:flex; gap: 10px; justify-content:center; flex-wrap: wrap; }
+   button{
+     appearance:none; border: 0; border-radius: 12px; padding: 12px 14px;
+     font-weight: 900; cursor: pointer; min-width: 120px;
      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
    }
-   .ghost { background: rgba(0,0,0,.08); color: rgba(0,0,0,.85); }
-   .noRed { background:#ff3b30; color:#fff; }
-   .yesGreen { background:#34c759; color:#fff; }
-   .small {
-     margin-top: 10px;
-     font-size: 12px;
-     color: rgba(0,0,0,.6);
-     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-   }
-   /* Question text animation */
+   .ghost{ background: rgba(0,0,0,.08); color: rgba(0,0,0,.85); }
+   .noRed{ background:#ff3b30; color:#fff; }
+   .yesGreen{ background:#34c759; color:#fff; }
+   .small{ margin-top: 10px; font-size: 12px; color: rgba(0,0,0,.6); }
    .qAnim{
      display:inline-block;
      opacity: 0;
@@ -115,26 +63,15 @@
      45%{ transform: scale(1.03); }
      100%{ transform: scale(1); }
    }
-   /* Button sizing for "are you sure" step */
-   .btnSmall { flex: 0 0 110px; min-width: 110px; padding: 10px 12px; }
-   .btnBig   { flex: 1 1 220px; min-width: 220px; padding: 14px 16px; }
-   /* One big green button */
-   .btnMega  { flex: 1 1 320px; min-width: 320px; padding: 16px 18px; font-size: 18px; }
-   /* Emoji rain */
+   .btnSmall{ flex: 0 0 110px; min-width: 110px; padding: 10px 12px; }
+   .btnBig{ flex: 1 1 220px; min-width: 220px; padding: 14px 16px; }
+   .btnMega{ flex: 1 1 320px; min-width: 320px; padding: 16px 18px; font-size: 18px; }
    .rainLayer{
-     position: absolute;
-     inset: 0;
-     pointer-events: none;
-     z-index: 1;
-     overflow: hidden;
+     position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: hidden;
    }
    .dropEmoji{
-     position: absolute;
-     top: -10vh;
-     font-size: 26px;
-     animation-name: fall;
-     animation-timing-function: linear;
-     animation-fill-mode: forwards;
+     position: absolute; top: -10vh; font-size: 26px;
+     animation-name: fall; animation-timing-function: linear; animation-fill-mode: forwards;
      filter: drop-shadow(0 6px 10px rgba(0,0,0,.18));
      opacity: 0.95;
    }
@@ -164,10 +101,8 @@
 </div>
 <script>
    const HEART_NEED = 3;
-   // "Yay" pages
    const YAY_TEXT = "Yay";
    const RAIN_EMOJIS = ["🫶🏼","🦖","🌻"];
-   // Optional pixel assets
    const ASSETS = {
      bg: "assets/bg.png",
      clouds: "assets/clouds.png",
@@ -184,8 +119,8 @@
    const ovTitle = document.getElementById("ovTitle");
    const ovText = document.getElementById("ovText");
    const btnNext = document.getElementById("btnNext");
-   const btnYesK = document.getElementById("btnYesK"); // green
-   const btnNoK  = document.getElementById("btnNoK");  // red
+   const btnYesK = document.getElementById("btnYesK");
+   const btnNoK  = document.getElementById("btnNoK");
    const btnReplay = document.getElementById("btnReplay");
    const W = canvas.width, H = canvas.height;
    canvas.style.touchAction = "manipulation";
@@ -201,7 +136,7 @@
    }
    const rand = (a,b)=> a + Math.random()*(b-a);
    const state = {
-     mode: "loading", // loading | start | play | lose | win
+     mode: "loading",
      t: 0,
      score: 0,
      best: 0,
@@ -216,9 +151,43 @@
    const pipes = [];
    const hearts = [];
    const ground = { y: H - 64, h: 64, scroll: 0 };
-   // Ask flow
-   let rejectStep = 0; // 0: ask, 1: are you sure, 2: one more try
+   let rejectStep = 0;
    let rainTimer = null;
+   function arcadeFont(sizePx) {
+     return `900 ${sizePx}px "Arcade", system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+   }
+   function outlinedText(text, x, y, size, fill, outline, outlineW, align) {
+     ctx.save();
+     ctx.font = arcadeFont(size);
+     ctx.textAlign = align || "left";
+     ctx.textBaseline = "alphabetic";
+     ctx.lineJoin = "round";
+     ctx.miterLimit = 2;
+     ctx.lineWidth = outlineW;
+     ctx.strokeStyle = outline;
+     ctx.strokeText(text, x, y);
+     ctx.fillStyle = fill;
+     ctx.fillText(text, x, y);
+     ctx.restore();
+   }
+   function outlinedTextShadow(text, x, y, size, fill, outline, outlineW, shadow, align) {
+     ctx.save();
+     ctx.font = arcadeFont(size);
+     ctx.textAlign = align || "left";
+     ctx.textBaseline = "alphabetic";
+     if (shadow) {
+       ctx.fillStyle = shadow;
+       ctx.fillText(text, x + 3, y + 3);
+     }
+     ctx.lineJoin = "round";
+     ctx.miterLimit = 2;
+     ctx.lineWidth = outlineW;
+     ctx.strokeStyle = outline;
+     ctx.strokeText(text, x, y);
+     ctx.fillStyle = fill;
+     ctx.fillText(text, x, y);
+     ctx.restore();
+   }
    function rectCircle(rx, ry, rw, rh, cx, cy, cr) {
      const nx = Math.max(rx, Math.min(cx, rx + rw));
      const ny = Math.max(ry, Math.min(cy, ry + rh));
@@ -343,7 +312,7 @@
      rejectStep = 2;
      ovTitle.textContent = "";
      ovTitle.classList.remove("wonGreen");
-     ovText.textContent = "I will give you one more try!";
+     ovText.textContent = "I will give you ONE more try!";
      restartQuestionAnim();
      stopRain();
      show(btnNext, false);
@@ -358,7 +327,7 @@
      if (type === "win") {
        ovTitle.textContent = "YOU WON!";
        ovTitle.classList.add("wonGreen");
-       ovText.textContent = `SCORE ${state.score}   BEST ${state.best}`;
+       ovText.textContent = `SCORE ${state.score} BEST ${state.best}`;
        restartQuestionAnim();
        stopRain();
        show(btnNext, true);
@@ -387,7 +356,7 @@
      if (type === "lose") {
        ovTitle.textContent = "Try again";
        ovTitle.classList.remove("wonGreen");
-       ovText.textContent = `SCORE ${state.score}   HEARTS ${state.hearts}/${HEART_NEED}`;
+       ovText.textContent = `SCORE ${state.score} HEARTS ${state.hearts}/${HEART_NEED}`;
        restartQuestionAnim();
        stopRain();
        show(btnNext, false);
@@ -399,31 +368,15 @@
    }
    btnReplay.addEventListener("click", () => resetToStart());
    btnNext.addEventListener("click", () => showOverlay("ask"));
-   // Green button clicks
    btnYesK.addEventListener("click", () => {
-     if (rejectStep === 0) { showOverlay("yay"); return; } // 네
-     if (rejectStep === 1) { showOverlay("yay"); return; } // no at are you sure
-     if (rejectStep === 2) { showOverlay("yay"); return; } // 응, 사귀자
+     if (rejectStep === 0) { showOverlay("yay"); return; }
+     if (rejectStep === 1) { showOverlay("yay"); return; }
+     if (rejectStep === 2) { showOverlay("yay"); return; }
    });
-   // Red button clicks
    btnNoK.addEventListener("click", () => {
-     if (rejectStep === 0) { setAskStep1(); return; } // 아니
-     if (rejectStep === 1) { setAskStep2(); return; } // yes
+     if (rejectStep === 0) { setAskStep1(); return; }
+     if (rejectStep === 1) { setAskStep2(); return; }
    });
-   function arcadeFont(sizePx) {
-     return `900 ${sizePx}px "Arcade", system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-   }
-   function drawText(x, y, text, size, color, shadow) {
-     ctx.save();
-     ctx.font = arcadeFont(size);
-     if (shadow) {
-       ctx.fillStyle = shadow;
-       ctx.fillText(text, x + 2, y + 2);
-     }
-     ctx.fillStyle = color;
-     ctx.fillText(text, x, y);
-     ctx.restore();
-   }
    function drawHeartShape(x, y, s) {
      ctx.save();
      ctx.translate(x, y);
@@ -554,31 +507,34 @@
        ctx.beginPath(); ctx.moveTo(10,1); ctx.lineTo(18,5); ctx.lineTo(10,9); ctx.closePath(); ctx.fill();
        ctx.restore();
      }
-     // HUD uses Arcade
-     ctx.fillStyle = "rgba(0,0,0,.70)";
-     ctx.font = arcadeFont(18);
-     ctx.fillText(`${state.hearts}/${HEART_NEED} ❤`, 14, 26);
+     /* HUD in Arcade + white outline */
+     outlinedText(`${state.hearts}/${HEART_NEED} ❤`, 14, 26, 18, "rgba(0,0,0,.70)", "#ffffff", 5, "left");
      if (state.mode === "start") {
-       drawText(78, 280, "FLAPPY", 36, "#ff2e7a", "rgba(0,0,0,.25)");
-       drawText(98, 320, "BIRD", 36, "#ff2e7a", "rgba(0,0,0,.25)");
+       /* Title bigger, centered, Arcade + white outline */
+       outlinedTextShadow("FLAPPY", W/2, 280, 44, "#ff2e7a", "#ffffff", 7, "rgba(0,0,0,.18)", "center");
+       outlinedTextShadow("BIRD",   W/2, 330, 44, "#ff2e7a", "#ffffff", 7, "rgba(0,0,0,.18)", "center");
+       /* Start button */
+       const bx = W/2 - 105;
+       const by = 360;
+       const bw = 210;
+       const bh = 62;
        if (img.btnStart) {
-         ctx.drawImage(img.btnStart, W/2 - 110, 360, 220, 70);
+         ctx.drawImage(img.btnStart, W/2 - 110, 352, 220, 80);
+         outlinedText("START", W/2, 400, 26, "#ffffff", "#ffffff", 0, "center");
        } else {
          ctx.fillStyle = "#ff2e7a";
-         ctx.fillRect(W/2 - 105, 362, 210, 62);
-         ctx.fillStyle = "rgba(0,0,0,.2)";
-         ctx.fillRect(W/2 - 105, 424, 210, 6);
-         ctx.fillStyle = "#fff";
-         ctx.font = arcadeFont(22);
-         ctx.fillText("START", W/2 - 48, 404);
+         ctx.fillRect(bx, by, bw, bh);
+         ctx.fillStyle = "rgba(0,0,0,.18)";
+         ctx.fillRect(bx, by + bh, bw, 6);
+         /* Center START inside the box, bigger, Arcade + white outline */
+         outlinedText("START", W/2, by + 40, 28, "#ffffff", "#ffffff", 0, "center");
        }
-       ctx.fillStyle = "rgba(0,0,0,.60)";
-       ctx.font = arcadeFont(13);
-       ctx.fillText("TAP TO START AND FLAP", 58, 462);
-       ctx.fillText("COLLECT 3 HEARTS", 86, 482);
+       /* Instructions bigger, centered, Arcade + white outline */
+       outlinedText("TAP TO START AND FLAP", W/2, 468, 16, "rgba(0,0,0,.70)", "#ffffff", 5, "center");
+       outlinedText("COLLECT 3 HEARTS",      W/2, 492, 16, "rgba(0,0,0,.70)", "#ffffff", 5, "center");
      }
    }
-   function onTap(x, y) {
+   function onTap() {
      if (overlay.style.display === "flex") return;
      if (state.mode === "loading") return;
      if (state.mode === "start") {
@@ -589,10 +545,7 @@
      if (state.mode === "play") flap();
    }
    window.addEventListener("pointerdown", (e) => {
-     const r = canvas.getBoundingClientRect();
-     const x = (e.clientX - r.left) * (canvas.width / r.width);
-     const y = (e.clientY - r.top) * (canvas.height / r.height);
-     onTap(x, y);
+     onTap();
      e.preventDefault();
    }, { passive: false });
    function loop() {
@@ -604,69 +557,12 @@
      state.mode = "loading";
      await Promise.all(Object.entries(ASSETS).map(([k, src]) => loadImage(k, src)));
      if (document.fonts && document.fonts.load) {
-       await document.fonts.load('18px "Arcade"');
-       await document.fonts.load('36px "Arcade"');
+       await document.fonts.load('16px "Arcade"');
+       await document.fonts.load('44px "Arcade"');
      }
      resetToStart();
      loop();
    }
-   // Overlay flow
-   function showOverlay(type) {
-     overlay.style.display = "flex";
-     if (type === "win") {
-       ovTitle.textContent = "YOU WON!";
-       ovTitle.classList.add("wonGreen");
-       ovText.textContent = `SCORE ${state.score}   BEST ${state.best}`;
-       restartQuestionAnim();
-       stopRain();
-       show(btnNext, true);
-       show(btnNoK, false);
-       show(btnYesK, false);
-       show(btnReplay, true);
-       btnReplay.textContent = "Play again";
-       rejectStep = 0;
-       resetAskButtonsDefault();
-       return;
-     }
-     if (type === "ask") { setAskStep0(); return; }
-     if (type === "yay") {
-       ovTitle.textContent = "";
-       ovTitle.classList.remove("wonGreen");
-       ovText.textContent = YAY_TEXT;
-       restartQuestionAnim();
-       show(btnNext, false);
-       show(btnNoK, false);
-       show(btnYesK, false);
-       show(btnReplay, true);
-       btnReplay.textContent = "Play again";
-       startRain();
-       return;
-     }
-     if (type === "lose") {
-       ovTitle.textContent = "Try again";
-       ovTitle.classList.remove("wonGreen");
-       ovText.textContent = `SCORE ${state.score}   HEARTS ${state.hearts}/${HEART_NEED}`;
-       restartQuestionAnim();
-       stopRain();
-       show(btnNext, false);
-       show(btnNoK, false);
-       show(btnYesK, false);
-       show(btnReplay, true);
-       btnReplay.textContent = "Play again";
-     }
-   }
-   btnReplay.addEventListener("click", () => resetToStart());
-   btnNext.addEventListener("click", () => showOverlay("ask"));
-   btnYesK.addEventListener("click", () => {
-     if (rejectStep === 0) { showOverlay("yay"); return; }
-     if (rejectStep === 1) { showOverlay("yay"); return; }
-     if (rejectStep === 2) { showOverlay("yay"); return; }
-   });
-   btnNoK.addEventListener("click", () => {
-     if (rejectStep === 0) { setAskStep1(); return; }
-     if (rejectStep === 1) { setAskStep2(); return; }
-   });
-   function show(el, on) { el.style.display = on ? "" : "none"; }
    boot();
 </script>
 </body>
