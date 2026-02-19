@@ -152,11 +152,84 @@ button{
   70%{ opacity:1; transform:translateY(7px) scale(1.02); }
   100%{ opacity:1; transform:translateY(0) scale(1); }
 }
-
 @keyframes qPulse{
   0%{ transform:scale(1); }
   45%{ transform:scale(1.03); }
   100%{ transform:scale(1); }
+}
+
+/* Photobooth */
+.boothSlot{
+  width:min(260px,72vw);
+  height:320px;
+  margin:0 auto;
+  border-radius:14px;
+  background:rgba(0,0,0,.06);
+  border:2px solid rgba(0,0,0,.10);
+  position:relative;
+  overflow:hidden;
+}
+
+#boothStrip{
+  position:absolute;
+  left:50%;
+  top:-120%;
+  transform:translateX(-50%);
+  width:220px;
+  border-radius:12px;
+  box-shadow:0 18px 50px rgba(0,0,0,.25);
+  opacity:0;
+}
+
+.boothPrint{
+  animation:boothPrint 1.6s cubic-bezier(.2,.9,.25,1) forwards;
+}
+
+@keyframes boothPrint{
+  0%{ top:-120%; opacity:0; transform:translateX(-50%) scale(.96); }
+  40%{ opacity:1; }
+  80%{ top:12%; transform:translateX(-50%) scale(1.02); }
+  100%{ top:18%; transform:translateX(-50%) scale(1); opacity:1; }
+}
+
+.boothActions{
+  margin-top:12px;
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+.boothActions button{
+  min-width:150px;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+
+.shareHint{
+  margin-top:10px;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  font-size:12px;
+  color:rgba(0,0,0,.60);
+}
+
+.boothMsg{
+  margin-top:12px;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  font-weight:900;
+  font-size:22px;
+  color:#111;
+  opacity:0;
+  transform:translateY(10px) scale(.98);
+}
+
+.boothMsg.show{
+  animation:boothMsgPop .65s cubic-bezier(.2,.9,.25,1) forwards;
+}
+
+@keyframes boothMsgPop{
+  0%{ opacity:0; transform:translateY(10px) scale(.98); }
+  70%{ opacity:1; transform:translateY(-4px) scale(1.03); }
+  100%{ opacity:1; transform:translateY(0) scale(1); }
 }
 </style>
 </head>
@@ -175,22 +248,32 @@ button{
 
     <div class="row">
       <button class="ghost" id="btnNext">NEXT ››</button>
-
       <button class="noRed" id="btnNo">아니</button>
       <button class="yesGreen" id="btnYes">네</button>
-
       <button class="ghost" id="btnReplay">Play again</button>
+    </div>
+
+    <div id="booth" style="display:none;margin-top:14px;">
+      <div class="boothSlot">
+        <img id="boothStrip" src="assets/photobooth.png" alt="">
+      </div>
+
+      <div class="boothActions">
+        <button class="ghost" id="btnSavePhoto">Save photo</button>
+        <button class="ghost" id="btnShareIG">Share to Instagram</button>
+      </div>
+
+      <div id="shareHint" class="shareHint" style="display:none;"></div>
+      <div id="boothMsg" class="boothMsg"></div>
     </div>
   </div>
 </div>
 
 <script>
-/* Settings */
 const HEART_NEED = 3;
 const YAY_TEXT = "Yayyy!!!";
 const RAIN_EMOJIS = ["🫶🏼","🦖","🌻"];
 
-/* Optional pixel assets */
 const ASSETS = {
   bg: "assets/bg.png",
   clouds: "assets/clouds.png",
@@ -215,6 +298,13 @@ const btnYes = document.getElementById("btnYes");
 const btnNo = document.getElementById("btnNo");
 const btnReplay = document.getElementById("btnReplay");
 
+const booth = document.getElementById("booth");
+const boothStrip = document.getElementById("boothStrip");
+const btnSavePhoto = document.getElementById("btnSavePhoto");
+const btnShareIG = document.getElementById("btnShareIG");
+const shareHint = document.getElementById("shareHint");
+const boothMsg = document.getElementById("boothMsg");
+
 const W = canvas.width;
 const H = canvas.height;
 
@@ -231,7 +321,7 @@ function loadImage(key, src){
 function rand(a,b){ return a + Math.random() * (b - a); }
 
 const state = {
-  mode: "loading", /* loading | start | play | lose | win */
+  mode: "loading",
   t: 0,
   score: 0,
   best: 0,
@@ -250,11 +340,9 @@ const pipes = [];
 const hearts = [];
 const ground = { y: H - 64, h: 64, scroll: 0 };
 
-/* Overlay flow */
-let rejectStep = 0; /* 0 ask, 1 are you sure, 2 one more try */
+let rejectStep = 0;
 let rainTimer = null;
 
-/* Arcade outline for canvas */
 function arcadeFont(px){
   return `900 ${px}px "Arcade", system-ui, -apple-system, Segoe UI, Roboto, Arial`;
 }
@@ -295,7 +383,6 @@ function outlineTextShadow(text, x, y, size, fill, stroke, strokeW, shadow, alig
   ctx.restore();
 }
 
-/* Collisions */
 function rectCircle(rx, ry, rw, rh, cx, cy, cr){
   const nx = Math.max(rx, Math.min(cx, rx + rw));
   const ny = Math.max(ry, Math.min(cy, ry + rh));
@@ -304,7 +391,6 @@ function rectCircle(rx, ry, rw, rh, cx, cy, cr){
   return (dx*dx + dy*dy) <= cr*cr;
 }
 
-/* World */
 function spawnSet(x){
   const topH = rand(90, H - (ground.h + 120) - PIPE_GAP);
   const gapY = topH + PIPE_GAP;
@@ -318,200 +404,6 @@ function spawnSet(x){
   });
 }
 
-function resetToStart(){
-  state.mode = "start";
-  state.t = 0;
-  state.score = 0;
-  state.hearts = 0;
-
-  bird.x = 110;
-  bird.y = H * 0.45;
-  bird.vy = 0;
-
-  pipes.length = 0;
-  hearts.length = 0;
-
-  spawnSet(W + 70);
-  spawnSet(W + 70 + PIPE_SPACING);
-  spawnSet(W + 70 + PIPE_SPACING * 2);
-
-  overlay.style.display = "none";
-  stopRain();
-  rejectStep = 0;
-  setAskButtonsDefault();
-}
-
-function startGame(){
-  state.mode = "play";
-}
-
-function lose(){
-  if (state.mode !== "play") return;
-  state.mode = "lose";
-  state.best = Math.max(state.best, state.score);
-  showOverlay("lose");
-}
-
-function win(){
-  if (state.mode !== "play") return;
-  state.mode = "win";
-  state.best = Math.max(state.best, state.score);
-  showOverlay("win");
-}
-
-function flap(){
-  if (state.mode === "start") startGame();
-  if (state.mode !== "play") return;
-  bird.vy = phys.flap;
-}
-
-/* Overlay helpers */
-function restartQuestionAnim(){
-  ovText.classList.remove("qAnim");
-  void ovText.offsetWidth;
-  ovText.classList.add("qAnim");
-}
-
-function show(el, on){
-  el.style.display = on ? "" : "none";
-}
-
-function setAskButtonsDefault(){
-  btnNo.className = "noRed";
-  btnYes.className = "yesGreen";
-  btnNo.textContent = "아니🥺";
-  btnYes.textContent = "네🥰";
-}
-
-function setAskStep0(){
-  rejectStep = 0;
-
-  ovTitle.textContent = "";
-  ovTitle.classList.remove("wonGreen");
-
-  ovText.classList.remove("normalFont");
-  ovText.textContent = "나랑 사귈래?";
-  restartQuestionAnim();
-
-  show(btnNext, false);
-  show(btnNo, true);
-  show(btnYes, true);
-  show(btnReplay, false);
-
-  stopRain();
-  setAskButtonsDefault();
-}
-
-function setAskStep1(){
-  rejectStep = 1;
-
-  ovTitle.textContent = "";
-  ovTitle.classList.remove("wonGreen");
-
-  ovText.classList.add("normalFont");
-  ovText.textContent = "ARE YOU SURE?";
-  restartQuestionAnim();
-
-  show(btnNext, false);
-  show(btnNo, true);
-  show(btnYes, true);
-  show(btnReplay, false);
-
-  btnNo.textContent = "YES";
-  btnYes.textContent = "NO";
-  btnNo.className = "noRed btnSmall";
-  btnYes.className = "yesGreen btnBig";
-
-  stopRain();
-}
-
-function setAskStep2(){
-  rejectStep = 2;
-
-  ovTitle.textContent = "";
-  ovTitle.classList.remove("wonGreen");
-
-  ovText.classList.add("normalFont");
-  ovText.textContent = "I WILL GIVE YOU ONE MORE TRY!";
-  restartQuestionAnim();
-
-  show(btnNext, false);
-  show(btnNo, false);
-  show(btnYes, true);
-  show(btnReplay, false);
-
-  btnYes.textContent = "응, 사귀자!";
-  btnYes.className = "yesGreen btnMega";
-
-  stopRain();
-}
-
-function showOverlay(type){
-  overlay.style.display = "flex";
-
-  if (type === "win"){
-    ovTitle.textContent = "YOU WON";
-    ovTitle.classList.add("wonGreen");
-
-    ovText.classList.remove("normalFont");
-    ovText.textContent = `SCORE ${state.score} BEST ${state.best}`;
-    restartQuestionAnim();
-
-    show(btnNext, true);
-    show(btnNo, false);
-    show(btnYes, false);
-    show(btnReplay, true);
-
-    btnReplay.textContent = "Play again";
-
-    stopRain();
-    rejectStep = 0;
-    setAskButtonsDefault();
-    return;
-  }
-
-  if (type === "ask"){
-    setAskStep0();
-    return;
-  }
-
-  if (type === "yay"){
-    ovTitle.textContent = "";
-    ovTitle.classList.remove("wonGreen");
-
-    ovText.classList.add("normalFont");
-    ovText.textContent = YAY_TEXT;
-    restartQuestionAnim();
-
-    show(btnNext, false);
-    show(btnNo, false);
-    show(btnYes, false);
-    show(btnReplay, true);
-
-    btnReplay.textContent = "Play again";
-    startRain();
-    return;
-  }
-
-  if (type === "lose"){
-    ovTitle.textContent = "Try again";
-    ovTitle.classList.remove("wonGreen");
-
-    ovText.classList.remove("normalFont");
-    ovText.textContent = `SCORE ${state.score} HEARTS ${state.hearts}/${HEART_NEED}`;
-    restartQuestionAnim();
-
-    show(btnNext, false);
-    show(btnNo, false);
-    show(btnYes, false);
-    show(btnReplay, true);
-
-    btnReplay.textContent = "Play again";
-    stopRain();
-  }
-}
-
-/* Rain */
 function stopRain(){
   if (rainTimer) clearInterval(rainTimer);
   rainTimer = null;
@@ -545,22 +437,317 @@ function startRain(){
   rainTimer = setInterval(() => { for (let i = 0; i < 3; i++) makeOne(); }, 140);
 }
 
-/* Overlay button actions */
-btnReplay.addEventListener("click", () => resetToStart());
+function restartQuestionAnim(){
+  ovText.classList.remove("qAnim");
+  void ovText.offsetWidth;
+  ovText.classList.add("qAnim");
+}
+
+function show(el, on){
+  el.style.display = on ? "" : "none";
+}
+
+function setAskButtonsDefault(){
+  btnNo.className = "noRed";
+  btnYes.className = "yesGreen";
+  btnNo.textContent = "아니🥺😢";
+  btnYes.textContent = "네🥰";
+}
+
+function hideBoothAll(){
+  booth.style.display = "none";
+  boothStrip.classList.remove("boothPrint");
+  boothMsg.textContent = "";
+  boothMsg.classList.remove("show");
+  shareHint.style.display = "none";
+  shareHint.textContent = "";
+  btnSavePhoto.style.display = "none";
+  btnShareIG.style.display = "none";
+}
+
+function setReplay(label, fn){
+  btnReplay.textContent = label;
+  btnReplay.onclick = fn;
+}
+
+function resetToStart(){
+  state.mode = "start";
+  state.t = 0;
+  state.score = 0;
+  state.hearts = 0;
+
+  bird.x = 110;
+  bird.y = H * 0.45;
+  bird.vy = 0;
+
+  pipes.length = 0;
+  hearts.length = 0;
+
+  spawnSet(W + 70);
+  spawnSet(W + 70 + PIPE_SPACING);
+  spawnSet(W + 70 + PIPE_SPACING * 2);
+
+  overlay.style.display = "none";
+  stopRain();
+  hideBoothAll();
+  rejectStep = 0;
+  setAskButtonsDefault();
+}
+
+function startGame(){
+  state.mode = "play";
+}
+
+function lose(){
+  if (state.mode !== "play") return;
+  state.mode = "lose";
+  state.best = Math.max(state.best, state.score);
+  showOverlay("lose");
+}
+
+function win(){
+  if (state.mode !== "play") return;
+  state.mode = "win";
+  state.best = Math.max(state.best, state.score);
+  showOverlay("win");
+}
+
+function flap(){
+  if (state.mode === "start") startGame();
+  if (state.mode !== "play") return;
+  bird.vy = phys.flap;
+}
+
+function setAskStep0(){
+  rejectStep = 0;
+
+  ovTitle.textContent = "";
+  ovTitle.classList.remove("wonGreen");
+
+  ovText.classList.remove("normalFont");
+  ovText.textContent = "나랑 사귈래?";
+  restartQuestionAnim();
+
+  hideBoothAll();
+  stopRain();
+
+  show(btnNext, false);
+  show(btnNo, true);
+  show(btnYes, true);
+  show(btnReplay, false);
+
+  setAskButtonsDefault();
+}
+
+function setAskStep1(){
+  rejectStep = 1;
+
+  ovTitle.textContent = "";
+  ovTitle.classList.remove("wonGreen");
+
+  ovText.classList.add("normalFont");
+  ovText.textContent = "ARE YOU SURE?";
+  restartQuestionAnim();
+
+  hideBoothAll();
+  stopRain();
+
+  show(btnNext, false);
+  show(btnNo, true);
+  show(btnYes, true);
+  show(btnReplay, false);
+
+  btnNo.textContent = "YES";
+  btnYes.textContent = "NO";
+  btnNo.className = "noRed btnSmall";
+  btnYes.className = "yesGreen btnBig";
+}
+
+function setAskStep2(){
+  rejectStep = 2;
+
+  ovTitle.textContent = "";
+  ovTitle.classList.remove("wonGreen");
+
+  ovText.classList.add("normalFont");
+  ovText.textContent = "I WILL GIVE YOU ONE MORE TRY!";
+  restartQuestionAnim();
+
+  hideBoothAll();
+  stopRain();
+
+  show(btnNext, false);
+  show(btnNo, false);
+  show(btnYes, true);
+  show(btnReplay, false);
+
+  btnYes.textContent = "응, 사귀자";
+  btnYes.className = "yesGreen btnMega";
+}
+
+function runPhotoBooth(){
+  booth.style.display = "";
+  boothStrip.classList.remove("boothPrint");
+  void boothStrip.offsetWidth;
+  boothStrip.classList.add("boothPrint");
+}
+
+function showBoothMessage(){
+  boothMsg.textContent = "이제 내 거야";
+  boothMsg.classList.remove("show");
+  void boothMsg.offsetWidth;
+  boothMsg.classList.add("show");
+}
+
+async function fetchBoothBlob(){
+  const res = await fetch(boothStrip.src, { cache: "no-store" });
+  return await res.blob();
+}
+
+btnSavePhoto.addEventListener("click", async () => {
+  try{
+    const blob = await fetchBoothBlob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "photobooth.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1200);
+  }catch(e){
+    shareHint.style.display = "";
+    shareHint.textContent = "Long press the photo and save.";
+  }
+});
+
+btnShareIG.addEventListener("click", async () => {
+  shareHint.style.display = "none";
+  shareHint.textContent = "";
+
+  try{
+    const blob = await fetchBoothBlob();
+    const file = new File([blob], "photobooth.png", { type: blob.type || "image/png" });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ title:"Photobooth", text:"", files:[file] });
+      return;
+    }
+
+    if (navigator.share){
+      await navigator.share({ title:"Photobooth", text:"" });
+      shareHint.style.display = "";
+      shareHint.textContent = "Pick Instagram from the share list.";
+      return;
+    }
+
+    shareHint.style.display = "";
+    shareHint.textContent = "Open in Safari, then Share, then Instagram.";
+  }catch(e){
+    shareHint.style.display = "";
+    shareHint.textContent = "Share closed.";
+  }
+});
+
+function showOverlay(type){
+  overlay.style.display = "flex";
+
+  if (type === "win"){
+    ovTitle.textContent = "YOU WON!";
+    ovTitle.classList.add("wonGreen");
+
+    ovText.classList.remove("normalFont");
+    ovText.textContent = `SCORE ${state.score} BEST ${state.best}`;
+    restartQuestionAnim();
+
+    hideBoothAll();
+    stopRain();
+
+    show(btnNext, true);
+    show(btnNo, false);
+    show(btnYes, false);
+    show(btnReplay, true);
+
+    setReplay("Play again", () => resetToStart());
+    rejectStep = 0;
+    setAskButtonsDefault();
+    return;
+  }
+
+  if (type === "ask"){
+    setAskStep0();
+    return;
+  }
+
+  if (type === "yay"){
+    ovTitle.textContent = "";
+    ovTitle.classList.remove("wonGreen");
+
+    ovText.classList.add("normalFont");
+    ovText.textContent = YAY_TEXT;
+    restartQuestionAnim();
+
+    hideBoothAll();
+    startRain();
+
+    show(btnNext, false);
+    show(btnNo, false);
+    show(btnYes, false);
+    show(btnReplay, true);
+
+    setReplay("Next", () => {
+      show(btnReplay, false);
+
+      stopRain();
+      hideBoothAll();
+
+      runPhotoBooth();
+
+      setTimeout(() => {
+        btnSavePhoto.style.display = "";
+        btnShareIG.style.display = "";
+        showBoothMessage();
+      }, 1700);
+    });
+
+    return;
+  }
+
+  if (type === "lose"){
+    ovTitle.textContent = "Try again";
+    ovTitle.classList.remove("wonGreen");
+
+    ovText.classList.remove("normalFont");
+    ovText.textContent = `SCORE ${state.score} HEARTS ${state.hearts}/${HEART_NEED}`;
+    restartQuestionAnim();
+
+    hideBoothAll();
+    stopRain();
+
+    show(btnNext, false);
+    show(btnNo, false);
+    show(btnYes, false);
+    show(btnReplay, true);
+
+    setReplay("Play again", () => resetToStart());
+  }
+}
+
 btnNext.addEventListener("click", () => showOverlay("ask"));
 
 btnYes.addEventListener("click", () => {
-  if (rejectStep === 0) { showOverlay("yay"); return; } /* 네 */
-  if (rejectStep === 1) { showOverlay("yay"); return; } /* NO on are you sure */
-  if (rejectStep === 2) { showOverlay("yay"); return; } /* 응, 사귀자 */
+  if (rejectStep === 0) { showOverlay("yay"); return; }
+  if (rejectStep === 1) { showOverlay("yay"); return; }
+  if (rejectStep === 2) { showOverlay("yay"); return; }
 });
 
 btnNo.addEventListener("click", () => {
-  if (rejectStep === 0) { setAskStep1(); return; } /* 아니 */
-  if (rejectStep === 1) { setAskStep2(); return; } /* YES */
+  if (rejectStep === 0) { setAskStep1(); return; }
+  if (rejectStep === 1) { setAskStep2(); return; }
 });
 
-/* Update + draw */
 function update(){
   state.t++;
 
@@ -703,7 +890,6 @@ function draw(){
     ctx.restore();
   }
 
-  /* HUD in Arcade with white outline */
   outlineText(`${state.hearts}/${HEART_NEED} ❤`, 14, 26, 18, "rgba(0,0,0,.70)", "#ffffff", 5, "left");
 
   if (state.mode === "start"){
@@ -724,14 +910,11 @@ function draw(){
     }
 
     outlineText("START", W/2, 400, 28, "#ffffff", "#ffffff", 0, "center");
-
-    /* Updated start screen text */
     outlineText("TAP TO PLAY", W/2, 468, 16, "rgba(0,0,0,.70)", "#ffffff", 5, "center");
-    outlineText("COLLECT 3 HEARTS FOR A SPECIAL PRIZE", W/2, 492, 12, "rgba(0,0,0,.70)", "#ffffff", 5, "center");
+    outlineText("GET 3 HEARTS, UNLOCK A QUESTION", W/2, 492, 12, "rgba(0,0,0,.70)", "#ffffff", 5, "center");
   }
 }
 
-/* Input */
 window.addEventListener("pointerdown", (e) => {
   if (overlay.style.display === "flex") return;
   if (state.mode === "loading") return;
@@ -746,14 +929,12 @@ window.addEventListener("pointerdown", (e) => {
   e.preventDefault();
 }, { passive:false });
 
-/* Loop */
 function loop(){
   update();
   draw();
   requestAnimationFrame(loop);
 }
 
-/* Boot */
 async function boot(){
   state.mode = "loading";
   await Promise.all(Object.entries(ASSETS).map(([k, src]) => loadImage(k, src)));
