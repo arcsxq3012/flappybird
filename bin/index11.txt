@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#ffb7c9" />
+<title>Flappy Bird</title>
+
+<style>
+@font-face{
+  font-family:"Arcade";
+  src:url("assets/arcade.ttf") format("truetype");
+  font-display:swap;
+}
+
+:root{ color-scheme:light; }
+
+html,body{
+  height:100%;
+  margin:0;
+  background:#ffb7c9;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+
+.wrap{
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px;
+  box-sizing:border-box;
+}
+
+canvas{
+  width:min(96vw,420px);
+  height:auto;
+  border-radius:16px;
+  background:#ffb7c9;
+  box-shadow:0 16px 60px rgba(0,0,0,.28);
+  touch-action:manipulation;
+}
+
+/* Overlay */
+.overlay{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.45);
+  padding:18px;
+  overflow:hidden;
+}
+
+.rainLayer{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  overflow:hidden;
+  z-index:1;
+}
+
+.dropEmoji{
+  position:absolute;
+  top:-12vh;
+  font-size:26px;
+  opacity:.95;
+  filter:drop-shadow(0 6px 10px rgba(0,0,0,.18));
+  animation:fall linear forwards;
+}
+
+@keyframes fall{
+  0%{ transform:translateY(-12vh) rotate(0deg); }
+  100%{ transform:translateY(120vh) rotate(360deg); }
+}
+
+.card{
+  width:min(92vw,420px);
+  background:rgba(255,255,255,.92);
+  border:2px solid rgba(0,0,0,.18);
+  border-radius:14px;
+  padding:16px;
+  text-align:center;
+  box-shadow:0 18px 60px rgba(0,0,0,.35);
+  position:relative;
+  z-index:2;
+}
+
+/* Overlay fonts default to Arcade */
+.overlay .title,
+.overlay .text,
+.overlay button{
+  font-family:"Arcade",system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+
+/* Screens that must be normal font */
+.text.normalFont{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+
+.title{
+  margin:0 0 8px;
+  font-weight:900;
+  font-size:20px;
+  color:#111;
+}
+
+.title.wonGreen{ color:#34c759; }
+
+.text{
+  margin:0 0 14px;
+  font-weight:900;
+  font-size:22px;
+  color:rgba(0,0,0,.88);
+  line-height:1.2;
+}
+
+.row{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+button{
+  appearance:none;
+  border:0;
+  border-radius:12px;
+  padding:12px 14px;
+  font-weight:900;
+  cursor:pointer;
+  min-width:140px;
+}
+
+.ghost{ background:rgba(0,0,0,.08); color:rgba(0,0,0,.85); }
+.noRed{ background:#ff3b30; color:#fff; }
+.yesGreen{ background:#34c759; color:#fff; }
+
+.btnSmall{ flex:0 0 110px; min-width:110px; padding:10px 12px; }
+.btnBig{ flex:1 1 220px; min-width:220px; padding:14px 16px; }
+.btnMega{ flex:1 1 320px; min-width:320px; padding:16px 18px; font-size:18px; }
+
+.qAnim{
+  display:inline-block;
+  opacity:0;
+  transform:translateY(-18px) scale(.98);
+  animation:qDrop .55s ease forwards, qPulse .9s ease .55s 1;
+}
+
+@keyframes qDrop{
+  0%{ opacity:0; transform:translateY(-18px) scale(.98); }
+  70%{ opacity:1; transform:translateY(7px) scale(1.02); }
+  100%{ opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes qPulse{
+  0%{ transform:scale(1); }
+  45%{ transform:scale(1.03); }
+  100%{ transform:scale(1); }
+}
+
+/* Photobooth */
+.boothSlot{
+  width:min(260px,72vw);
+  height:320px;
+  margin:0 auto;
+  border-radius:14px;
+  background:rgba(0,0,0,.06);
+  border:2px solid rgba(0,0,0,.10);
+  position:relative;
+  overflow:hidden;
+}
+
+/* Slot opening flap */
+.boothSlot::before{
+  content:"";
+  position:absolute;
+  left:14px;
+  right:14px;
+  top:16px;
+  height:18px;
+  background:rgba(0,0,0,.12);
+  border-radius:12px;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35);
+  z-index:3;
+  transform:scaleY(1);
+  transform-origin:center;
+  opacity:1;
+}
+
+.boothSlot.open::before{
+  animation:slotOpen .55s ease-out forwards;
+}
+
+@keyframes slotOpen{
+  0%{ transform:scaleY(1); opacity:1; }
+  100%{ transform:scaleY(.25); opacity:.55; }
+}
+
+/* Wrapper controls motion + final scale */
+.boothWrap{
+  position:absolute;
+  left:50%;
+  top:18%;
+  width:220px;
+  transform:translateX(-50%) translateY(0) scale(1);
+  opacity:1;
+  z-index:2;
+  transition:transform .45s ease;
+}
+
+/* Image stays visible after animations */
+#boothStrip{
+  width:100%;
+  height:auto;
+  display:block;
+  border-radius:12px;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,.10),
+    0 22px 55px rgba(0,0,0,.10);
+}
+
+/* 3.2s print */
+.boothWrap.boothPrint{
+  animation:boothPrint 3.2s cubic-bezier(.18,.85,.25,1) forwards;
+}
+
+/* shadow growth happens from the image shadow + scale feel */
+@keyframes boothPrint{
+  0%{
+    transform:translateX(-50%) translateY(-140%) scale(.96);
+    opacity:0;
+  }
+  20%{ opacity:1; }
+  70%{
+    transform:translateX(-50%) translateY(-8%) scale(1.01);
+  }
+  88%{
+    transform:translateX(-50%) translateY(0) scale(.995);
+  }
+  100%{
+    transform:translateX(-50%) translateY(0) scale(1);
+    opacity:1;
+  }
+}
+
+/* shake after print */
+.boothWrap.boothShake{
+  animation:polaroidShake .55s ease-in-out 1;
+}
+
+@keyframes polaroidShake{
+  0%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
+  18%{ transform:translateX(-50%) translateY(-2px) rotate(-1.2deg) scale(1); }
+  38%{ transform:translateX(-50%) translateY(1px) rotate(1.1deg) scale(1); }
+  60%{ transform:translateX(-50%) translateY(-1px) rotate(-0.8deg) scale(1); }
+  100%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
+}
+
+/* final: smaller so full strip fits in booth */
+.boothWrap.boothFinal{
+  transform:translateX(-50%) translateY(0) scale(.78);
+}
+
+.boothActions{
+  margin-top:12px;
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+.boothActions button{
+  min-width:150px;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+
+.shareHint{
+  margin-top:10px;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  font-size:12px;
+  color:rgba(0,0,0,.60);
+}
+
+.boothMsg{
+  margin-top:12px;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  font-weight:900;
+  font-size:22px;
+  color:#111;
+  opacity:0;
+  transform:translateY(10px) scale(.98);
+}
+
+.boothMsg.show{
+  animation:boothMsgPop .65s cubic-bezier(.2,.9,.25,1) forwards;
+}
+
+@keyframes boothMsgPop{
+  0%{ opacity:0; transform:translateY(10px) scale(.98); }
+  70%{ opacity:1; transform:translateY(-4px) scale(1.03); }
+  100%{ opacity:1; transform:translateY(0) scale(1); }
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <canvas id="c" width="360" height="640"></canvas>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="rainLayer" id="rainLayer"></div>
+
+  <div class="card">
+    <p class="title" id="ovTitle"></p>
+    <p class="text qAnim" id="ovText"></p>
+
+    <div class="row">
+      <button class="ghost" id="btnNext">NEXT ››</button>
+      <button class="noRed" id="btnNo">아니</button>
+      <button class="yesGreen" id="btnYes">네</button>
+      <button class="ghost" id="btnReplay">Play again</button>
+    </div>
+
+    <div id="booth" style="display:none;margin-top:14px;">
+      <div class="boothSlot">
+        <div id="boothWrap" class="boothWrap">
+          <img id="boothStrip" src="assets/photobooth.png" alt="">
+        </div>
+      </div>
+
+      <div class="boothActions">
+        <button class="ghost" id="btnSavePhoto">Save photo</button>
+        <button class="ghost" id="btnShareIG">Share to Instagram</button>
+      </div>
+
+      <div id="shareHint" class="shareHint" style="display:none;"></div>
+      <div id="boothMsg" class="boothMsg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const HEART_NEED = 3;
+const YAY_TEXT = "Yayyy!!!";
+const RAIN_EMOJIS = ["🫶🏼","🦖","🌻"];
+
+const ASSETS = {
+  bg: "assets/bg.png",
+  clouds: "assets/clouds.png",
+  ground: "assets/ground.png",
+  bird: "assets/bird.png",
+  pipe: "assets/pipe.png",
+  heart: "assets/heart.png",
+  btnStart: "assets/btn_start.png"
+};
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+
+const overlay = document.getElementById("overlay");
+const rainLayer = document.getElementById("rainLayer");
+const ovTitle = document.getElementById("ovTitle");
+const ovText = document.getElementById("ovText");
+
+const btnNext = document.getElementById("btnNext");
+const btnYes = document.getElementById("btnYes");
+const btnNo = document.getElementById("btnNo");
+const btnReplay = document.getElementById("btnReplay");
+
+const booth = document.getElementById("booth");
+const boothSlot = booth.querySelector(".boothSlot");
+const boothWrap = document.getElementById("boothWrap");
+const boothStrip = document.getElementById("boothStrip");
+const btnSavePhoto = document.getElementById("btnSavePhoto");
+const btnShareIG = document.getElementById("btnShareIG");
+const shareHint = document.getElementById("shareHint");
+const boothMsg = document.getElementById("boothMsg");
+
+const W = canvas.width;
+const H = canvas.height;
+
+const img = {};
+function loadImage(key, src){
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => { img[key] = im; resolve(true); };
+    im.onerror = () => resolve(false);
+    im.src = src;
+  });
+}
+
+function rand(a,b){ return a + Math.random() * (b - a); }
+
+const state = {
+  mode: "loading",
+  t: 0,
+  score: 0,
+  best: 0,
+  hearts: 0
+};
+
+const bird = { x: 110, y: H * 0.45, r: 12, vy: 0 };
+const phys = { g: 0.52, flap: -8.8, maxFall: 12.5 };
+
+const PIPE_W = 54;
+const PIPE_GAP = 160;
+const PIPE_SPACING = 190;
+const SPEED = 2.6;
+
+const pipes = [];
+const hearts = [];
+const ground = { y: H - 64, h: 64, scroll: 0 };
+
+let rejectStep = 0;
+let rainTimer = null;
+
+function arcadeFont(px){
+  return `900 ${px}px "Arcade", system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+}
+
+function outlineText(text, x, y, size, fill, stroke, strokeW, align){
+  ctx.save();
+  ctx.font = arcadeFont(size);
+  ctx.textAlign = align || "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.lineWidth = strokeW;
+  ctx.strokeStyle = stroke;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function outlineTextShadow(text, x, y, size, fill, stroke, strokeW, shadow, align){
+  ctx.save();
+  ctx.font = arcadeFont(size);
+  ctx.textAlign = align || "left";
+  ctx.textBaseline = "alphabetic";
+
+  if (shadow){
+    ctx.fillStyle = shadow;
+    ctx.fillText(text, x + 3, y + 3);
+  }
+
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.lineWidth = strokeW;
+  ctx.strokeStyle = stroke;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function rectCircle(rx, ry, rw, rh, cx, cy, cr){
+  const nx = Math.max(rx, Math.min(cx, rx + rw));
+  const ny = Math.max(ry, Math.min(cy, ry + rh));
+  const dx = cx - nx;
+  const dy = cy - ny;
+  return (dx*dx + dy*dy) <= cr*cr;
+}
+
+function spawnSet(x){
+  const topH = rand(90, H - (ground.h + 120) - PIPE_GAP);
+  const gapY = topH + PIPE_GAP;
+
+  pipes.push({ x, topH, gapY, passed: false });
+
+  hearts.push({
+    x: x + PIPE_W + 50,
+    y: (topH + gapY) * 0.5 + rand(-22, 22),
+    taken: false
+  });
+}
+
+function stopRain(){
+  if (rainTimer) clearInterval(rainTimer);
+  rainTimer = null;
+  rainLayer.innerHTML = "";
+}
+
+function startRain(){
+  stopRain();
+
+  function makeOne(){
+    const el = document.createElement("div");
+    el.className = "dropEmoji";
+    el.textContent = RAIN_EMOJIS[(Math.random() * RAIN_EMOJIS.length) | 0];
+
+    const left = Math.random() * 100;
+    const dur = rand(1.8, 3.8);
+    const size = rand(18, 34);
+
+    el.style.left = left + "vw";
+    el.style.fontSize = size + "px";
+    el.style.animationDuration = dur + "s";
+
+    rainLayer.appendChild(el);
+
+    setTimeout(() => {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }, dur * 1000 + 250);
+  }
+
+  for (let i = 0; i < 18; i++) setTimeout(makeOne, i * 40);
+  rainTimer = setInterval(() => { for (let i = 0; i < 3; i++) makeOne(); }, 140);
+}
+
+function restartQuestionAnim(){
+  ovText.classList.remove("qAnim");
+  void ovText.offsetWidth;
+  ovText.classList.add("qAnim");
+}
+
+function show(el, on){
+  el.style.display = on ? "" : "none";
+}
+
+function setAskButtonsDefault(){
+  btnNo.className = "noRed";
+  btnYes.className = "yesGreen";
+  btnNo.textContent = "아니🥺😢";
+  btnYes.textContent = "네🥰";
+}
+
+function hideBoothAll(){
+  booth.style.display = "none";
+  boothSlot.classList.remove("open");
+  boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
+  boothMsg.textContent = "";
+  boothMsg.classList.remove("show");
+  shareHint.style.display = "none";
+  shareHint.textContent = "";
+  btnSavePhoto.style.display = "none";
+  btnShareIG.style.display = "none";
+}
+
+function setReplay(label, fn){
+  btnReplay.textContent = label;
+  btnReplay.onclick = fn;
+}
+
+function resetToStart(){
+  state.mode = "start";
+  state.t = 0;
+  state.score = 0;
+  state.hearts = 0;
+
+  bird.x = 110;
+  bird.y = H * 0.45;
+  bird.vy = 0;
+
+  pipes.length = 0;
+  hearts.length = 0;
+
+  spawnSet(W + 70);
+  spawnSet(W + 70 + PIPE_SPACING);
+  spawnSet(W + 70 + PIPE_SPACING * 2);
+
+  overlay.style.display = "none";
+  stopRain();
+  hideBoothAll();
+  rejectStep = 0;
+  setAskButtonsDefault();
+}
+
+function startGame(){
+  state.mode = "play";
+}
+
+function lose(){
+  if (state.mode !== "play") return;
+  state.mode = "lose";
+  state.best = Math.max(state.best, state.score);
+  showOverlay("lose");
+}
+
+function win(){
+  if (state.mode !== "play") return;
+  state.mode = "win";
+  state.best = Math.max(state.best, state.score);
+  showOverlay("win");
+}
+
+function flap(){
+  if (state.mode === "start") startGame();
+  if (state.mode !== "play") return;
+  bird.vy = phys.flap;
+}
+
+function setAskStep0(){
+  rejectStep = 0;
+
+  ovTitle.textContent = "";
+  ovTitle.classList.remove("wonGreen");
+
+  ovText.classList.remove("normalFont");
+  ovText.textContent = "나랑 사귈래?";
+  restartQuestionAnim();
+
+  hideBoothAll();
+  stopRain();
+
+  show(btnNext, false);
+  show(btnNo, true);
+  show(btnYes, true);
+  show(btnReplay, false);
+
+  setAskButtonsDefault();
+}
+
+function setAskStep1(){
+  rejectStep = 1;
+
+  ovTitle.textContent = "";
+  ovTitle.classList.remove("wonGreen");
+
+  ovText.classList.add("normalFont");
+  ovText.textContent = "ARE YOU SURE?";
+  restartQuestionAnim();
+
+  hideBoothAll();
+  stopRain();
+
+  show(btnNext, false);
+  show(btnNo, true);
+  show(btnYes, true);
+  show(btnReplay, false);
+
+  btnNo.textContent = "YES";
+  btnYes.textContent = "NO";
+  btnNo.className = "noRed btnSmall";
+  btnYes.className = "yesGreen btnBig";
+}
+
+function setAskStep2(){
+  rejectStep = 2;
+
+  ovTitle.textContent = "";
+  ovTitle.classList.remove("wonGreen");
+
+  ovText.classList.add("normalFont");
+  ovText.textContent = "I WILL GIVE YOU ONE MORE TRY!";
+  restartQuestionAnim();
+
+  hideBoothAll();
+  stopRain();
+
+  show(btnNext, false);
+  show(btnNo, false);
+  show(btnYes, true);
+  show(btnReplay, false);
+
+  btnYes.textContent = "응, 사귀자";
+  btnYes.className = "yesGreen btnMega";
+}
+
+function runPhotoBooth(){
+  booth.style.display = "";
+
+  boothSlot.classList.remove("open");
+  boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
+
+  void boothWrap.offsetWidth;
+
+  boothSlot.classList.add("open");
+  boothWrap.classList.add("boothPrint");
+
+  setTimeout(() => {
+    boothWrap.classList.remove("boothPrint");
+    boothWrap.classList.add("boothShake");
+  }, 3200);
+
+  setTimeout(() => {
+    boothWrap.classList.add("boothFinal");
+  }, 3800);
+}
+
+function showBoothMessage(){
+  boothMsg.textContent = "이제 내 거야😚";
+  boothMsg.classList.remove("show");
+  void boothMsg.offsetWidth;
+  boothMsg.classList.add("show");
+}
+
+async function fetchBoothBlob(){
+  const res = await fetch(boothStrip.src, { cache: "no-store" });
+  return await res.blob();
+}
+
+btnSavePhoto.addEventListener("click", async () => {
+  try{
+    const blob = await fetchBoothBlob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "photobooth.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1200);
+  }catch(e){
+    shareHint.style.display = "";
+    shareHint.textContent = "Long press the photo and save.";
+  }
+});
+
+btnShareIG.addEventListener("click", async () => {
+  shareHint.style.display = "none";
+  shareHint.textContent = "";
+
+  try{
+    const blob = await fetchBoothBlob();
+    const file = new File([blob], "photobooth.png", { type: blob.type || "image/png" });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ title:"Photobooth", text:"", files:[file] });
+      return;
+    }
+
+    if (navigator.share){
+      await navigator.share({ title:"Photobooth", text:"" });
+      shareHint.style.display = "";
+      shareHint.textContent = "Pick Instagram from the share list.";
+      return;
+    }
+
+    shareHint.style.display = "";
+    shareHint.textContent = "Open in Safari, then Share, then Instagram.";
+  }catch(e){
+    shareHint.style.display = "";
+    shareHint.textContent = "Share closed.";
+  }
+});
+
+function showOverlay(type){
+  overlay.style.display = "flex";
+
+  if (type === "win"){
+    ovTitle.textContent = "YOU WON!";
+    ovTitle.classList.add("wonGreen");
+
+    ovText.classList.remove("normalFont");
+    ovText.textContent = `SCORE ${state.score} BEST ${state.best}`;
+    restartQuestionAnim();
+
+    hideBoothAll();
+    stopRain();
+
+    show(btnNext, true);
+    show(btnNo, false);
+    show(btnYes, false);
+    show(btnReplay, true);
+
+    setReplay("Play again", () => resetToStart());
+    rejectStep = 0;
+    setAskButtonsDefault();
+    return;
+  }
+
+  if (type === "ask"){
+    setAskStep0();
+    return;
+  }
+
+  if (type === "yay"){
+    ovTitle.textContent = "";
+    ovTitle.classList.remove("wonGreen");
+
+    ovText.classList.add("normalFont");
+    ovText.textContent = YAY_TEXT;
+    restartQuestionAnim();
+
+    hideBoothAll();
+    startRain();
+
+    show(btnNext, false);
+    show(btnNo, false);
+    show(btnYes, false);
+    show(btnReplay, true);
+
+    setReplay("Next", () => {
+      show(btnReplay, false);
+
+      stopRain();
+      hideBoothAll();
+
+      runPhotoBooth();
+
+      setTimeout(() => {
+        btnSavePhoto.style.display = "";
+        btnShareIG.style.display = "";
+        showBoothMessage();
+      }, 3900);
+    });
+
+    return;
+  }
+
+  if (type === "lose"){
+    ovTitle.textContent = "Try again";
+    ovTitle.classList.remove("wonGreen");
+
+    ovText.classList.remove("normalFont");
+    ovText.textContent = `SCORE ${state.score} HEARTS ${state.hearts}/${HEART_NEED}`;
+    restartQuestionAnim();
+
+    hideBoothAll();
+    stopRain();
+
+    show(btnNext, false);
+    show(btnNo, false);
+    show(btnYes, false);
+    show(btnReplay, true);
+
+    setReplay("Play again", () => resetToStart());
+  }
+}
+
+btnNext.addEventListener("click", () => showOverlay("ask"));
+
+btnYes.addEventListener("click", () => {
+  if (rejectStep === 0) { showOverlay("yay"); return; }
+  if (rejectStep === 1) { showOverlay("yay"); return; }
+  if (rejectStep === 2) { showOverlay("yay"); return; }
+});
+
+btnNo.addEventListener("click", () => {
+  if (rejectStep === 0) { setAskStep1(); return; }
+  if (rejectStep === 1) { setAskStep2(); return; }
+});
+
+function update(){
+  state.t++;
+
+  if (state.mode === "play"){
+    bird.vy += phys.g;
+    if (bird.vy > phys.maxFall) bird.vy = phys.maxFall;
+    bird.y += bird.vy;
+
+    for (const p of pipes){
+      p.x -= SPEED;
+
+      if (!p.passed && p.x + PIPE_W < bird.x){
+        p.passed = true;
+        state.score++;
+      }
+
+      const topRect = { x: p.x, y: 0, w: PIPE_W, h: p.topH };
+      const botRect = { x: p.x, y: p.gapY, w: PIPE_W, h: ground.y - p.gapY };
+
+      if (rectCircle(topRect.x, topRect.y, topRect.w, topRect.h, bird.x, bird.y, bird.r)) lose();
+      if (rectCircle(botRect.x, botRect.y, botRect.w, botRect.h, bird.x, bird.y, bird.r)) lose();
+    }
+
+    for (const h of hearts){
+      h.x -= SPEED;
+      if (!h.taken){
+        const dx = bird.x - h.x;
+        const dy = bird.y - h.y;
+        const rr = bird.r + 12;
+        if ((dx*dx + dy*dy) <= rr*rr){
+          h.taken = true;
+          state.hearts++;
+          if (state.hearts >= HEART_NEED) win();
+        }
+      }
+    }
+
+    if (pipes.length && pipes[0].x + PIPE_W < -70){
+      pipes.shift();
+      spawnSet(pipes[pipes.length - 1].x + PIPE_SPACING);
+    }
+    while (hearts.length && hearts[0].x < -90) hearts.shift();
+
+    if (bird.y - bird.r < 0){ bird.y = bird.r; bird.vy = 0; }
+    if (bird.y + bird.r > ground.y) lose();
+
+    ground.scroll = (ground.scroll + SPEED) % W;
+  }
+
+  if (state.mode === "start"){
+    bird.y = H * 0.45 + Math.sin(state.t * 0.06) * 6;
+  }
+}
+
+function drawHeartShape(x, y, s){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.beginPath();
+  ctx.moveTo(0, 4);
+  ctx.bezierCurveTo(0, -6, -12, -6, -12, 4);
+  ctx.bezierCurveTo(-12, 14, 0, 18, 0, 26);
+  ctx.bezierCurveTo(0, 18, 12, 14, 12, 4);
+  ctx.bezierCurveTo(12, -6, 0, -6, 0, 4);
+  ctx.closePath();
+  ctx.fillStyle = "#ff2e7a";
+  ctx.fill();
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0, 0, W, H);
+
+  if (img.bg) ctx.drawImage(img.bg, 0, 0, W, H);
+  else { ctx.fillStyle = "#ffc1d0"; ctx.fillRect(0, 0, W, H); }
+
+  if (img.clouds){
+    ctx.globalAlpha = 0.95;
+    ctx.drawImage(img.clouds, 0, 0, W, H);
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,.9)";
+    ctx.beginPath(); ctx.arc(70, H-140, 26, 0, Math.PI*2); ctx.arc(96, H-145, 30, 0, Math.PI*2); ctx.arc(128, H-140, 22, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(W-90, H-170, 24, 0, Math.PI*2); ctx.arc(W-60, H-176, 30, 0, Math.PI*2); ctx.arc(W-30, H-170, 22, 0, Math.PI*2); ctx.fill();
+  }
+
+  for (const p of pipes){
+    if (img.pipe){
+      ctx.drawImage(img.pipe, p.x, p.gapY, PIPE_W, ground.y - p.gapY);
+      ctx.save();
+      ctx.translate(p.x + PIPE_W, p.topH);
+      ctx.scale(-1, -1);
+      ctx.drawImage(img.pipe, 0, 0, PIPE_W, p.topH);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = "#ff4a7b";
+      ctx.fillRect(p.x, 0, PIPE_W, p.topH);
+      ctx.fillRect(p.x, p.gapY, PIPE_W, ground.y - p.gapY);
+      ctx.fillStyle = "rgba(0,0,0,.18)";
+      ctx.fillRect(p.x, p.topH - 10, PIPE_W, 10);
+      ctx.fillRect(p.x, p.gapY, PIPE_W, 10);
+    }
+  }
+
+  for (const h of hearts){
+    if (h.taken) continue;
+    if (img.heart) ctx.drawImage(img.heart, h.x - 12, h.y - 12, 24, 24);
+    else drawHeartShape(h.x, h.y, 0.8);
+  }
+
+  if (img.ground){
+    const y = ground.y;
+    const x0 = -ground.scroll;
+    for (let x = x0; x < W; x += W) ctx.drawImage(img.ground, x, y, W, ground.h);
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,.35)";
+    ctx.fillRect(0, ground.y, W, ground.h);
+    ctx.fillStyle = "rgba(0,0,0,.08)";
+    ctx.fillRect(0, ground.y, W, 3);
+  }
+
+  if (img.bird){
+    ctx.save();
+    ctx.translate(bird.x, bird.y);
+    const rot = Math.max(-0.5, Math.min(0.8, bird.vy / 11));
+    ctx.rotate(rot);
+    ctx.drawImage(img.bird, -18, -14, 36, 28);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.translate(bird.x, bird.y);
+    const rot = Math.max(-0.5, Math.min(0.8, bird.vy / 11));
+    ctx.rotate(rot);
+    ctx.fillStyle = "#ffe66d";
+    ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,.6)";
+    ctx.beginPath(); ctx.arc(4,-3,2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#ffb000";
+    ctx.beginPath(); ctx.moveTo(10,1); ctx.lineTo(18,5); ctx.lineTo(10,9); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  outlineText(`${state.hearts}/${HEART_NEED} ❤`, 14, 26, 18, "rgba(0,0,0,.70)", "#ffffff", 5, "left");
+
+  if (state.mode === "start"){
+    outlineTextShadow("FLAPPY", W/2, 280, 44, "#ff2e7a", "#ffffff", 7, "rgba(0,0,0,.18)", "center");
+    outlineTextShadow("BIRD",   W/2, 330, 44, "#ff2e7a", "#ffffff", 7, "rgba(0,0,0,.18)", "center");
+
+    if (img.btnStart){
+      ctx.drawImage(img.btnStart, W/2 - 110, 352, 220, 80);
+    } else {
+      const bx = W/2 - 105;
+      const by = 360;
+      const bw = 210;
+      const bh = 62;
+      ctx.fillStyle = "#ff2e7a";
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = "rgba(0,0,0,.18)";
+      ctx.fillRect(bx, by + bh, bw, 6);
+    }
+
+    outlineText("START", W/2, 400, 28, "#ffffff", "#ffffff", 0, "center");
+    outlineText("TAP TO PLAY", W/2, 468, 16, "rgba(0,0,0,.70)", "#ffffff", 5, "center");
+    outlineText("COLLECT 3 HEARTS TO WIN A SPECIAL PRIZE", W/2, 492, 12, "rgba(0,0,0,.70)", "#ffffff", 5, "center");
+  }
+}
+
+window.addEventListener("pointerdown", (e) => {
+  if (overlay.style.display === "flex") return;
+  if (state.mode === "loading") return;
+
+  if (state.mode === "start"){
+    startGame();
+    bird.vy = phys.flap;
+    return;
+  }
+
+  if (state.mode === "play") flap();
+  e.preventDefault();
+}, { passive:false });
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+async function boot(){
+  state.mode = "loading";
+  await Promise.all(Object.entries(ASSETS).map(([k, src]) => loadImage(k, src)));
+
+  if (document.fonts && document.fonts.load){
+    await document.fonts.load('16px "Arcade"');
+    await document.fonts.load('44px "Arcade"');
+  }
+
+  resetToStart();
+  loop();
+}
+
+boot();
+</script>
+</body>
+</html>
