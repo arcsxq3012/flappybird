@@ -196,7 +196,7 @@ button{
   100%{ transform:scaleY(.25); opacity:.55; }
 }
 
-/* Wrapper controls motion + final scale */
+/* Wrapper controls motion */
 .boothWrap{
   position:absolute;
   left:50%;
@@ -205,10 +205,9 @@ button{
   transform:translateX(-50%) translateY(0) scale(1);
   opacity:1;
   z-index:2;
-  transition:transform .45s ease;
 }
 
-/* Image stays visible after animations */
+/* Image stays visible */
 #boothStrip{
   width:100%;
   height:auto;
@@ -230,12 +229,8 @@ button{
     opacity:0;
   }
   20%{ opacity:1; }
-  70%{
-    transform:translateX(-50%) translateY(-8%) scale(1.01);
-  }
-  88%{
-    transform:translateX(-50%) translateY(0) scale(.995);
-  }
+  70%{ transform:translateX(-50%) translateY(-8%) scale(1.01); }
+  88%{ transform:translateX(-50%) translateY(0) scale(.995); }
   100%{
     transform:translateX(-50%) translateY(0) scale(1);
     opacity:1;
@@ -253,11 +248,6 @@ button{
   38%{ transform:translateX(-50%) translateY(1px) rotate(1.1deg) scale(1); }
   60%{ transform:translateX(-50%) translateY(-1px) rotate(-0.8deg) scale(1); }
   100%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
-}
-
-/* final: smaller so full strip fits in booth (overridden by JS) */
-.boothWrap.boothFinal{
-  transform:translateX(-50%) translateY(0) scale(.78);
 }
 
 .boothActions{
@@ -415,6 +405,9 @@ const ground = { y: H - 64, h: 64, scroll: 0 };
 let rejectStep = 0;
 let rainTimer = null;
 
+/* frame-rate independent timing */
+let lastTs = 0;
+
 function arcadeFont(px){
   return `900 ${px}px "Arcade", system-ui, -apple-system, Segoe UI, Roboto, Arial`;
 }
@@ -529,7 +522,7 @@ function setAskButtonsDefault(){
 function hideBoothAll(){
   booth.style.display = "none";
   boothSlot.classList.remove("open");
-  boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
+  boothWrap.classList.remove("boothPrint","boothShake");
   boothWrap.style.width = "220px";
   boothWrap.style.top = "0px";
   boothMsg.textContent = "";
@@ -660,7 +653,7 @@ function setAskStep2(){
   btnYes.className = "yesGreen btnMega";
 }
 
-/* Fit strip inside booth */
+/* Fit strip fully inside the booth */
 function sizeStripToFitBooth(){
   if (!boothStrip.naturalWidth || !boothStrip.naturalHeight) return;
 
@@ -676,21 +669,21 @@ function sizeStripToFitBooth(){
 
   const aspect = boothStrip.naturalHeight / boothStrip.naturalWidth;
 
-  let w = Math.min(220, availW, availH / aspect);
-  w = Math.max(140, w);
+  let wFromH = availH / aspect;
+  let w = Math.min(availW, wFromH);
+  w = Math.max(120, w);
 
   const h = w * aspect;
 
   boothWrap.style.width = w + "px";
-  const topPx = Math.max(padTop, Math.round((slotH - h) / 2));
-  boothWrap.style.top = topPx + "px";
+  boothWrap.style.top = Math.max(padTop, Math.round((slotH - h) / 2)) + "px";
 }
 
 function runPhotoBooth(){
   booth.style.display = "";
 
   boothSlot.classList.remove("open");
-  boothWrap.classList.remove("boothPrint","boothShake","boothFinal");
+  boothWrap.classList.remove("boothPrint","boothShake");
 
   sizeStripToFitBooth();
 
@@ -703,10 +696,6 @@ function runPhotoBooth(){
     boothWrap.classList.remove("boothPrint");
     boothWrap.classList.add("boothShake");
   }, 3200);
-
-  setTimeout(() => {
-    boothWrap.classList.add("boothFinal");
-  }, 3800);
 }
 
 function showBoothMessage(){
@@ -826,7 +815,7 @@ function showOverlay(type){
         btnSavePhoto.style.display = "";
         btnShareIG.style.display = "";
         showBoothMessage();
-      }, 3900);
+      }, 3600);
     });
 
     return;
@@ -865,16 +854,16 @@ btnNo.addEventListener("click", () => {
   if (rejectStep === 1) { setAskStep2(); return; }
 });
 
-function update(){
-  state.t++;
+function update(step){
+  state.t += step;
 
   if (state.mode === "play"){
-    bird.vy += phys.g;
+    bird.vy += phys.g * step;
     if (bird.vy > phys.maxFall) bird.vy = phys.maxFall;
-    bird.y += bird.vy;
+    bird.y += bird.vy * step;
 
     for (const p of pipes){
-      p.x -= SPEED;
+      p.x -= SPEED * step;
 
       if (!p.passed && p.x + PIPE_W < bird.x){
         p.passed = true;
@@ -889,7 +878,7 @@ function update(){
     }
 
     for (const h of hearts){
-      h.x -= SPEED;
+      h.x -= SPEED * step;
       if (!h.taken){
         const dx = bird.x - h.x;
         const dy = bird.y - h.y;
@@ -911,7 +900,7 @@ function update(){
     if (bird.y - bird.r < 0){ bird.y = bird.r; bird.vy = 0; }
     if (bird.y + bird.r > ground.y) lose();
 
-    ground.scroll = (ground.scroll + SPEED) % W;
+    ground.scroll = (ground.scroll + SPEED * step) % W;
   }
 
   if (state.mode === "start"){
@@ -1046,8 +1035,15 @@ window.addEventListener("pointerdown", (e) => {
   e.preventDefault();
 }, { passive:false });
 
-function loop(){
-  update();
+function loop(ts){
+  if (!lastTs) lastTs = ts;
+  let dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+
+  if (dt > 0.05) dt = 0.05;
+  const step = dt * 60;
+
+  update(step);
   draw();
   requestAnimationFrame(loop);
 }
@@ -1070,7 +1066,7 @@ async function boot(){
   });
 
   resetToStart();
-  loop();
+  requestAnimationFrame(loop);
 }
 
 boot();
