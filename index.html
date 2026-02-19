@@ -12,7 +12,7 @@
    canvas { width: min(96vw, 420px); height: auto; border-radius: 16px; background:#ffb7c9; box-shadow: 0 16px 60px rgba(0,0,0,.28); touch-action: manipulation; }
    .overlay {
      position: fixed; inset: 0; display:none; align-items:center; justify-content:center;
-     background: rgba(0,0,0,.45); padding: 18px;
+     background: rgba(0,0,0,.45); padding: 18px; overflow: hidden;
    }
    .card {
      width: min(92vw, 420px);
@@ -23,6 +23,8 @@
      color: #111;
      box-shadow: 0 18px 60px rgba(0,0,0,.35);
      text-align: center;
+     position: relative;
+     z-index: 2;
    }
    .title { font-size: 18px; font-weight: 900; margin: 0 0 8px; }
    .text  { margin: 0 0 12px; color: rgba(0,0,0,.88); line-height: 1.2; font-weight: 900; font-size: 20px; }
@@ -51,11 +53,31 @@
      45%{ transform: scale(1.03); }
      100%{ transform: scale(1); }
    }
-   /* Button sizing for the "are you sure" step */
    .btnSmall { flex: 0 0 110px; min-width: 110px; padding: 10px 12px; }
    .btnBig   { flex: 1 1 220px; min-width: 220px; padding: 14px 16px; }
-   /* One big green button */
    .btnMega  { flex: 1 1 320px; min-width: 320px; padding: 16px 18px; font-size: 18px; }
+   /* Emoji rain */
+   .rainLayer{
+     position: absolute;
+     inset: 0;
+     pointer-events: none;
+     z-index: 1;
+     overflow: hidden;
+   }
+   .dropEmoji{
+     position: absolute;
+     top: -10vh;
+     font-size: 26px;
+     animation-name: fall;
+     animation-timing-function: linear;
+     animation-fill-mode: forwards;
+     filter: drop-shadow(0 6px 10px rgba(0,0,0,.18));
+     opacity: 0.95;
+   }
+   @keyframes fall{
+     0%{ transform: translateY(-10vh) rotate(0deg); }
+     100%{ transform: translateY(120vh) rotate(360deg); }
+   }
 </style>
 </head>
 <body>
@@ -63,6 +85,7 @@
 <canvas id="c" width="360" height="640"></canvas>
 </div>
 <div class="overlay" id="overlay">
+<div class="rainLayer" id="rainLayer"></div>
 <div class="card">
 <p class="title" id="ovTitle">YOU WON!</p>
 <p class="text qAnim" id="ovText">나랑 사귈래?</p>
@@ -76,9 +99,10 @@
 </div>
 </div>
 <script>
-   const AFTER_YES = "Yay 💗";
+   const AFTER_YES = "Yay";
    const AFTER_NO  = "Okay. No pressure.";
    const HEART_NEED = 3;
+   const RAIN_EMOJIS = ["🫶🏼","🦖","🌻"];
    const ASSETS = {
      bg: "assets/bg.png",
      clouds: "assets/clouds.png",
@@ -91,6 +115,7 @@
    const canvas = document.getElementById("c");
    const ctx = canvas.getContext("2d");
    const overlay = document.getElementById("overlay");
+   const rainLayer = document.getElementById("rainLayer");
    const ovTitle = document.getElementById("ovTitle");
    const ovText = document.getElementById("ovText");
    const btnNext = document.getElementById("btnNext");
@@ -128,6 +153,7 @@
    const ground = { y: H - 64, h: 64, scroll: 0 };
    // Ask flow
    let rejectStep = 0; // 0: normal ask, 1: are you sure, 2: one more try
+   let rainTimer = null;
    function rectCircle(rx, ry, rw, rh, cx, cy, cr) {
      const nx = Math.max(rx, Math.min(cx, rx + rw));
      const ny = Math.max(ry, Math.min(cy, ry + rh));
@@ -144,6 +170,37 @@
        taken: false
      });
    }
+   function stopRain() {
+     if (rainTimer) clearInterval(rainTimer);
+     rainTimer = null;
+     rainLayer.innerHTML = "";
+   }
+   function startRain() {
+     stopRain();
+     const makeOne = () => {
+       const el = document.createElement("div");
+       el.className = "dropEmoji";
+       el.textContent = RAIN_EMOJIS[(Math.random() * RAIN_EMOJIS.length) | 0];
+       const left = Math.random() * 100;
+       const dur = rand(1.8, 3.8);
+       const size = rand(18, 34);
+       const drift = rand(-10, 10);
+       el.style.left = left + "vw";
+       el.style.fontSize = size + "px";
+       el.style.animationDuration = dur + "s";
+       el.style.transform = `translateX(${drift}vw)`;
+       rainLayer.appendChild(el);
+       // cleanup
+       setTimeout(() => {
+         if (el && el.parentNode) el.parentNode.removeChild(el);
+       }, dur * 1000 + 200);
+     };
+     // burst + steady rain
+     for (let i = 0; i < 18; i++) setTimeout(makeOne, i * 40);
+     rainTimer = setInterval(() => {
+       for (let i = 0; i < 3; i++) makeOne();
+     }, 140);
+   }
    function resetToStart() {
      state.mode = "start";
      state.t = 0;
@@ -159,6 +216,7 @@
      spawnSet(W + 70 + PIPE_SPACING*2);
      overlay.style.display = "none";
      rejectStep = 0;
+     stopRain();
      resetAskButtonsDefault();
    }
    function startGame() { state.mode = "play"; }
@@ -190,16 +248,13 @@
      btnYesK.className = "yesGreen";
      btnNoK.textContent = "아니";
      btnYesK.textContent = "네";
-     btnNoK.style.flex = "";
-     btnYesK.style.flex = "";
-     btnNoK.style.minWidth = "";
-     btnYesK.style.minWidth = "";
    }
    function setAskStep0() {
      rejectStep = 0;
      ovTitle.textContent = "";
      ovText.textContent = "나랑 사귈래?";
      restartQuestionAnim();
+     stopRain();
      show(btnNext, false);
      show(btnNoK, true);
      show(btnYesK, true);
@@ -211,10 +266,12 @@
      ovTitle.textContent = "";
      ovText.textContent = "Are you sure?";
      restartQuestionAnim();
+     stopRain();
      show(btnNext, false);
      show(btnNoK, true);
      show(btnYesK, true);
      show(btnReplay, false);
+     // red becomes small "yes", green becomes big "no"
      btnNoK.textContent = "yes";
      btnYesK.textContent = "no";
      btnNoK.className = "noRed btnSmall";
@@ -225,6 +282,7 @@
      ovTitle.textContent = "";
      ovText.textContent = "I will give you one more try!";
      restartQuestionAnim();
+     stopRain();
      show(btnNext, false);
      show(btnNoK, false);
      show(btnYesK, true);
@@ -238,6 +296,7 @@
        ovTitle.textContent = "YOU WON!";
        ovText.textContent = `SCORE ${state.score}   BEST ${state.best}`;
        restartQuestionAnim();
+       stopRain();
        show(btnNext, true);
        show(btnNoK, false);
        show(btnYesK, false);
@@ -247,11 +306,8 @@
        resetAskButtonsDefault();
        return;
      }
-     if (type === "ask") {
-       setAskStep0();
-       return;
-     }
-     if (type === "yes") {
+     if (type === "ask") { setAskStep0(); return; }
+     if (type === "yay") {
        ovTitle.textContent = "";
        ovText.textContent = AFTER_YES;
        restartQuestionAnim();
@@ -260,12 +316,14 @@
        show(btnYesK, false);
        show(btnReplay, true);
        btnReplay.textContent = "Play again";
+       startRain();
        return;
      }
      if (type === "no") {
        ovTitle.textContent = "";
        ovText.textContent = AFTER_NO;
        restartQuestionAnim();
+       stopRain();
        show(btnNext, false);
        show(btnNoK, false);
        show(btnYesK, false);
@@ -277,6 +335,7 @@
        ovTitle.textContent = "Try again";
        ovText.textContent = `SCORE ${state.score}   HEARTS ${state.hearts}/${HEART_NEED}`;
        restartQuestionAnim();
+       stopRain();
        show(btnNext, false);
        show(btnNoK, false);
        show(btnYesK, false);
@@ -288,14 +347,14 @@
    btnNext.addEventListener("click", () => showOverlay("ask"));
    // Green button behavior changes by rejectStep
    btnYesK.addEventListener("click", () => {
-     if (rejectStep === 0) { showOverlay("yes"); return; }   // 네
-     if (rejectStep === 1) { showOverlay("no"); return; }    // no
-     if (rejectStep === 2) { showOverlay("yes"); return; }   // 응, 사귀자
+     if (rejectStep === 0) { showOverlay("yay"); return; }  // 네
+     if (rejectStep === 1) { showOverlay("yay"); return; }  // no at are you sure -> Yay
+     if (rejectStep === 2) { showOverlay("yay"); return; }  // 응, 사귀자 -> Yay
    });
    // Red button behavior changes by rejectStep
    btnNoK.addEventListener("click", () => {
-     if (rejectStep === 0) { setAskStep1(); return; }        // 아니 -> are you sure
-     if (rejectStep === 1) { setAskStep2(); return; }        // yes -> one more try
+     if (rejectStep === 0) { setAskStep1(); return; } // 아니 -> are you sure
+     if (rejectStep === 1) { setAskStep2(); return; } // yes -> one more try
    });
    function drawText(x, y, text, size, color, shadow) {
      ctx.save();
