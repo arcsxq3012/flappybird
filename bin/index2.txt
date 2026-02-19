@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#ffb7c9" />
+<title>Flappy Bird</title>
+<style>
+   :root { color-scheme: light; }
+   html, body { height: 100%; margin: 0; background:#ffb7c9; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+   .wrap { height: 100%; display:flex; align-items:center; justify-content:center; padding: 10px; box-sizing: border-box; }
+   canvas { width: min(96vw, 420px); height: auto; border-radius: 16px; background:#ffb7c9; box-shadow: 0 16px 60px rgba(0,0,0,.28); touch-action: manipulation; }
+   .overlay {
+     position: fixed; inset: 0; display:none; align-items:center; justify-content:center;
+     background: rgba(0,0,0,.45); padding: 18px;
+   }
+   .card {
+     width: min(92vw, 420px);
+     background: rgba(255,255,255,.92);
+     border: 2px solid rgba(0,0,0,.18);
+     border-radius: 14px;
+     padding: 16px;
+     color: #111;
+     box-shadow: 0 18px 60px rgba(0,0,0,.35);
+     text-align: center;
+   }
+   .title { font-size: 18px; font-weight: 900; margin: 0 0 8px; }
+   .text  { margin: 0 0 12px; color: rgba(0,0,0,.88); line-height: 1.2; font-weight: 900; font-size: 20px; }
+   .row { display:flex; gap: 10px; justify-content:center; flex-wrap: wrap; }
+   button {
+     appearance:none; border: 0; border-radius: 12px; padding: 12px 14px;
+     font-weight: 900; cursor: pointer; min-width: 120px;
+   }
+   .ghost { background: rgba(0,0,0,.08); color: rgba(0,0,0,.85); }
+   .noRed { background:#ff3b30; color:#fff; }
+   .yesGreen { background:#34c759; color:#fff; }
+   .small { margin-top: 10px; font-size: 12px; color: rgba(0,0,0,.6); }
+   .qAnim{
+     display:inline-block;
+     opacity: 0;
+     transform: translateY(-18px) scale(.98);
+     animation: qDrop .55s ease forwards, qPulse .9s ease .55s 1;
+   }
+   @keyframes qDrop{
+     0%{ opacity:0; transform: translateY(-18px) scale(.98); }
+     70%{ opacity:1; transform: translateY(7px) scale(1.02); }
+     100%{ opacity:1; transform: translateY(0) scale(1); }
+   }
+   @keyframes qPulse{
+     0%{ transform: scale(1); }
+     45%{ transform: scale(1.03); }
+     100%{ transform: scale(1); }
+   }
+   /* Button sizing for the "are you sure" step */
+   .btnSmall { flex: 0 0 110px; min-width: 110px; padding: 10px 12px; }
+   .btnBig   { flex: 1 1 220px; min-width: 220px; padding: 14px 16px; }
+   /* One big green button */
+   .btnMega  { flex: 1 1 320px; min-width: 320px; padding: 16px 18px; font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<canvas id="c" width="360" height="640"></canvas>
+</div>
+<div class="overlay" id="overlay">
+<div class="card">
+<p class="title" id="ovTitle">YOU WON!</p>
+<p class="text qAnim" id="ovText">나랑 사귈래?</p>
+<div class="row" id="ovButtons">
+<button class="ghost" id="btnNext">NEXT ››</button>
+<button class="noRed" id="btnNoK">아니</button>
+<button class="yesGreen" id="btnYesK">네</button>
+<button class="ghost" id="btnReplay">Play again</button>
+</div>
+<div class="small" id="ovSmall">Tap anywhere to flap during the game.</div>
+</div>
+</div>
+<script>
+   const AFTER_YES = "Yay 💗";
+   const AFTER_NO  = "Okay. No pressure.";
+   const HEART_NEED = 3;
+   const ASSETS = {
+     bg: "assets/bg.png",
+     clouds: "assets/clouds.png",
+     ground: "assets/ground.png",
+     bird: "assets/bird.png",
+     pipe: "assets/pipe.png",
+     heart: "assets/heart.png",
+     btnStart: "assets/btn_start.png"
+   };
+   const canvas = document.getElementById("c");
+   const ctx = canvas.getContext("2d");
+   const overlay = document.getElementById("overlay");
+   const ovTitle = document.getElementById("ovTitle");
+   const ovText = document.getElementById("ovText");
+   const btnNext = document.getElementById("btnNext");
+   const btnYesK = document.getElementById("btnYesK"); // green
+   const btnNoK  = document.getElementById("btnNoK");  // red
+   const btnReplay = document.getElementById("btnReplay");
+   const W = canvas.width, H = canvas.height;
+   canvas.style.touchAction = "manipulation";
+   ctx.imageSmoothingEnabled = false;
+   const img = {};
+   function loadImage(key, src) {
+     return new Promise((resolve) => {
+       const im = new Image();
+       im.onload = () => { img[key] = im; resolve(true); };
+       im.onerror = () => resolve(false);
+       im.src = src;
+     });
+   }
+   const rand = (a,b)=> a + Math.random()*(b-a);
+   const state = {
+     mode: "loading", // loading | start | play | lose | win
+     t: 0,
+     score: 0,
+     best: 0,
+     hearts: 0
+   };
+   const bird = { x: 110, y: H*0.45, r: 12, vy: 0 };
+   const phys = { g: 0.52, flap: -8.8, maxFall: 12.5 };
+   const PIPE_W = 54;
+   const PIPE_GAP = 160;
+   const PIPE_SPACING = 190;
+   const SPEED = 2.6;
+   const pipes = [];
+   const hearts = [];
+   const ground = { y: H - 64, h: 64, scroll: 0 };
+   // Ask flow
+   let rejectStep = 0; // 0: normal ask, 1: are you sure, 2: one more try
+   function rectCircle(rx, ry, rw, rh, cx, cy, cr) {
+     const nx = Math.max(rx, Math.min(cx, rx + rw));
+     const ny = Math.max(ry, Math.min(cy, ry + rh));
+     const dx = cx - nx, dy = cy - ny;
+     return (dx*dx + dy*dy) <= cr*cr;
+   }
+   function spawnSet(x) {
+     const topH = rand(90, H - (ground.h + 120) - PIPE_GAP);
+     const gapY = topH + PIPE_GAP;
+     pipes.push({ x, topH, gapY, passed: false });
+     hearts.push({
+       x: x + PIPE_W + 50,
+       y: (topH + gapY) * 0.5 + rand(-22, 22),
+       taken: false
+     });
+   }
+   function resetToStart() {
+     state.mode = "start";
+     state.t = 0;
+     state.score = 0;
+     state.hearts = 0;
+     bird.x = 110;
+     bird.y = H*0.45;
+     bird.vy = 0;
+     pipes.length = 0;
+     hearts.length = 0;
+     spawnSet(W + 70);
+     spawnSet(W + 70 + PIPE_SPACING);
+     spawnSet(W + 70 + PIPE_SPACING*2);
+     overlay.style.display = "none";
+     rejectStep = 0;
+     resetAskButtonsDefault();
+   }
+   function startGame() { state.mode = "play"; }
+   function lose() {
+     if (state.mode !== "play") return;
+     state.mode = "lose";
+     state.best = Math.max(state.best, state.score);
+     showOverlay("lose");
+   }
+   function win() {
+     if (state.mode !== "play") return;
+     state.mode = "win";
+     state.best = Math.max(state.best, state.score);
+     showOverlay("win");
+   }
+   function flap() {
+     if (state.mode === "start") startGame();
+     if (state.mode !== "play") return;
+     bird.vy = phys.flap;
+   }
+   function restartQuestionAnim() {
+     ovText.classList.remove("qAnim");
+     void ovText.offsetWidth;
+     ovText.classList.add("qAnim");
+   }
+   function show(el, on) { el.style.display = on ? "" : "none"; }
+   function resetAskButtonsDefault() {
+     btnNoK.className = "noRed";
+     btnYesK.className = "yesGreen";
+     btnNoK.textContent = "아니";
+     btnYesK.textContent = "네";
+     btnNoK.style.flex = "";
+     btnYesK.style.flex = "";
+     btnNoK.style.minWidth = "";
+     btnYesK.style.minWidth = "";
+   }
+   function setAskStep0() {
+     rejectStep = 0;
+     ovTitle.textContent = "";
+     ovText.textContent = "나랑 사귈래?";
+     restartQuestionAnim();
+     show(btnNext, false);
+     show(btnNoK, true);
+     show(btnYesK, true);
+     show(btnReplay, false);
+     resetAskButtonsDefault();
+   }
+   function setAskStep1() {
+     rejectStep = 1;
+     ovTitle.textContent = "";
+     ovText.textContent = "Are you sure?";
+     restartQuestionAnim();
+     show(btnNext, false);
+     show(btnNoK, true);
+     show(btnYesK, true);
+     show(btnReplay, false);
+     btnNoK.textContent = "yes";
+     btnYesK.textContent = "no";
+     btnNoK.className = "noRed btnSmall";
+     btnYesK.className = "yesGreen btnBig";
+   }
+   function setAskStep2() {
+     rejectStep = 2;
+     ovTitle.textContent = "";
+     ovText.textContent = "I will give you one more try!";
+     restartQuestionAnim();
+     show(btnNext, false);
+     show(btnNoK, false);
+     show(btnYesK, true);
+     show(btnReplay, false);
+     btnYesK.textContent = "응, 사귀자";
+     btnYesK.className = "yesGreen btnMega";
+   }
+   function showOverlay(type) {
+     overlay.style.display = "flex";
+     if (type === "win") {
+       ovTitle.textContent = "YOU WON!";
+       ovText.textContent = `SCORE ${state.score}   BEST ${state.best}`;
+       restartQuestionAnim();
+       show(btnNext, true);
+       show(btnNoK, false);
+       show(btnYesK, false);
+       show(btnReplay, true);
+       btnReplay.textContent = "Play again";
+       rejectStep = 0;
+       resetAskButtonsDefault();
+       return;
+     }
+     if (type === "ask") {
+       setAskStep0();
+       return;
+     }
+     if (type === "yes") {
+       ovTitle.textContent = "";
+       ovText.textContent = AFTER_YES;
+       restartQuestionAnim();
+       show(btnNext, false);
+       show(btnNoK, false);
+       show(btnYesK, false);
+       show(btnReplay, true);
+       btnReplay.textContent = "Play again";
+       return;
+     }
+     if (type === "no") {
+       ovTitle.textContent = "";
+       ovText.textContent = AFTER_NO;
+       restartQuestionAnim();
+       show(btnNext, false);
+       show(btnNoK, false);
+       show(btnYesK, false);
+       show(btnReplay, true);
+       btnReplay.textContent = "Play again";
+       return;
+     }
+     if (type === "lose") {
+       ovTitle.textContent = "Try again";
+       ovText.textContent = `SCORE ${state.score}   HEARTS ${state.hearts}/${HEART_NEED}`;
+       restartQuestionAnim();
+       show(btnNext, false);
+       show(btnNoK, false);
+       show(btnYesK, false);
+       show(btnReplay, true);
+       btnReplay.textContent = "Play again";
+     }
+   }
+   btnReplay.addEventListener("click", () => resetToStart());
+   btnNext.addEventListener("click", () => showOverlay("ask"));
+   // Green button behavior changes by rejectStep
+   btnYesK.addEventListener("click", () => {
+     if (rejectStep === 0) { showOverlay("yes"); return; }   // 네
+     if (rejectStep === 1) { showOverlay("no"); return; }    // no
+     if (rejectStep === 2) { showOverlay("yes"); return; }   // 응, 사귀자
+   });
+   // Red button behavior changes by rejectStep
+   btnNoK.addEventListener("click", () => {
+     if (rejectStep === 0) { setAskStep1(); return; }        // 아니 -> are you sure
+     if (rejectStep === 1) { setAskStep2(); return; }        // yes -> one more try
+   });
+   function drawText(x, y, text, size, color, shadow) {
+     ctx.save();
+     ctx.font = `900 ${size}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+     if (shadow) { ctx.fillStyle = shadow; ctx.fillText(text, x + 2, y + 2); }
+     ctx.fillStyle = color;
+     ctx.fillText(text, x, y);
+     ctx.restore();
+   }
+   function drawHeartShape(x, y, s) {
+     ctx.save();
+     ctx.translate(x, y);
+     ctx.scale(s, s);
+     ctx.beginPath();
+     ctx.moveTo(0, 4);
+     ctx.bezierCurveTo(0, -6, -12, -6, -12, 4);
+     ctx.bezierCurveTo(-12, 14, 0, 18, 0, 26);
+     ctx.bezierCurveTo(0, 18, 12, 14, 12, 4);
+     ctx.bezierCurveTo(12, -6, 0, -6, 0, 4);
+     ctx.closePath();
+     ctx.fillStyle = "#ff2e7a";
+     ctx.fill();
+     ctx.restore();
+   }
+   function update() {
+     state.t++;
+     if (state.mode === "play") {
+       bird.vy += phys.g;
+       if (bird.vy > phys.maxFall) bird.vy = phys.maxFall;
+       bird.y += bird.vy;
+       for (const p of pipes) {
+         p.x -= SPEED;
+         if (!p.passed && p.x + PIPE_W < bird.x) {
+           p.passed = true;
+           state.score++;
+         }
+         const topRect = { x: p.x, y: 0, w: PIPE_W, h: p.topH };
+         const botRect = { x: p.x, y: p.gapY, w: PIPE_W, h: ground.y - p.gapY };
+         if (rectCircle(topRect.x, topRect.y, topRect.w, topRect.h, bird.x, bird.y, bird.r)) lose();
+         if (rectCircle(botRect.x, botRect.y, botRect.w, botRect.h, bird.x, bird.y, bird.r)) lose();
+       }
+       for (const h of hearts) {
+         h.x -= SPEED;
+         if (!h.taken) {
+           const dx = bird.x - h.x, dy = bird.y - h.y;
+           const rr = (bird.r + 12);
+           if ((dx*dx + dy*dy) <= rr*rr) {
+             h.taken = true;
+             state.hearts++;
+             if (state.hearts >= HEART_NEED) win();
+           }
+         }
+       }
+       if (pipes.length && pipes[0].x + PIPE_W < -70) {
+         pipes.shift();
+         spawnSet(pipes[pipes.length - 1].x + PIPE_SPACING);
+       }
+       while (hearts.length && hearts[0].x < -90) hearts.shift();
+       if (bird.y - bird.r < 0) { bird.y = bird.r; bird.vy = 0; }
+       if (bird.y + bird.r > ground.y) lose();
+       ground.scroll = (ground.scroll + SPEED) % W;
+     }
+     if (state.mode === "start") {
+       bird.y = H*0.45 + Math.sin(state.t * 0.06) * 6;
+     }
+   }
+   function draw() {
+     ctx.clearRect(0, 0, W, H);
+     if (img.bg) ctx.drawImage(img.bg, 0, 0, W, H);
+     else { ctx.fillStyle = "#ffc1d0"; ctx.fillRect(0, 0, W, H); }
+     if (img.clouds) {
+       ctx.globalAlpha = 0.95;
+       ctx.drawImage(img.clouds, 0, 0, W, H);
+       ctx.globalAlpha = 1;
+     } else {
+       ctx.fillStyle = "rgba(255,255,255,.9)";
+       ctx.beginPath(); ctx.arc(70, H-140, 26, 0, Math.PI*2); ctx.arc(96, H-145, 30, 0, Math.PI*2); ctx.arc(128, H-140, 22, 0, Math.PI*2); ctx.fill();
+       ctx.beginPath(); ctx.arc(W-90, H-170, 24, 0, Math.PI*2); ctx.arc(W-60, H-176, 30, 0, Math.PI*2); ctx.arc(W-30, H-170, 22, 0, Math.PI*2); ctx.fill();
+     }
+     for (const p of pipes) {
+       if (img.pipe) {
+         ctx.drawImage(img.pipe, p.x, p.gapY, PIPE_W, ground.y - p.gapY);
+         ctx.save();
+         ctx.translate(p.x + PIPE_W, p.topH);
+         ctx.scale(-1, -1);
+         ctx.drawImage(img.pipe, 0, 0, PIPE_W, p.topH);
+         ctx.restore();
+       } else {
+         ctx.fillStyle = "#ff4a7b";
+         ctx.fillRect(p.x, 0, PIPE_W, p.topH);
+         ctx.fillRect(p.x, p.gapY, PIPE_W, ground.y - p.gapY);
+         ctx.fillStyle = "rgba(0,0,0,.18)";
+         ctx.fillRect(p.x, p.topH - 10, PIPE_W, 10);
+         ctx.fillRect(p.x, p.gapY, PIPE_W, 10);
+       }
+     }
+     for (const h of hearts) {
+       if (h.taken) continue;
+       if (img.heart) ctx.drawImage(img.heart, h.x - 12, h.y - 12, 24, 24);
+       else drawHeartShape(h.x, h.y, 0.8);
+     }
+     if (img.ground) {
+       const y = ground.y;
+       const x0 = -ground.scroll;
+       for (let x = x0; x < W; x += W) ctx.drawImage(img.ground, x, y, W, ground.h);
+     } else {
+       ctx.fillStyle = "rgba(255,255,255,.35)";
+       ctx.fillRect(0, ground.y, W, ground.h);
+       ctx.fillStyle = "rgba(0,0,0,.08)";
+       ctx.fillRect(0, ground.y, W, 3);
+     }
+     if (img.bird) {
+       ctx.save();
+       ctx.translate(bird.x, bird.y);
+       const rot = Math.max(-0.5, Math.min(0.8, bird.vy / 11));
+       ctx.rotate(rot);
+       ctx.drawImage(img.bird, -18, -14, 36, 28);
+       ctx.restore();
+     } else {
+       ctx.save();
+       ctx.translate(bird.x, bird.y);
+       const rot = Math.max(-0.5, Math.min(0.8, bird.vy / 11));
+       ctx.rotate(rot);
+       ctx.fillStyle = "#ffe66d";
+       ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill();
+       ctx.fillStyle = "rgba(0,0,0,.6)";
+       ctx.beginPath(); ctx.arc(4,-3,2,0,Math.PI*2); ctx.fill();
+       ctx.fillStyle = "#ffb000";
+       ctx.beginPath(); ctx.moveTo(10,1); ctx.lineTo(18,5); ctx.lineTo(10,9); ctx.closePath(); ctx.fill();
+       ctx.restore();
+     }
+     ctx.fillStyle = "rgba(0,0,0,.65)";
+     ctx.font = "900 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+     ctx.fillText(`${state.hearts}/${HEART_NEED} ❤`, 14, 26);
+     if (state.mode === "start") {
+       drawText(78, 280, "FLAPPY", 36, "#ff2e7a", "rgba(0,0,0,.25)");
+       drawText(88, 320, "BIRD", 36, "#ff2e7a", "rgba(0,0,0,.25)");
+       if (img.btnStart) {
+         ctx.drawImage(img.btnStart, W/2 - 110, 360, 220, 70);
+       } else {
+         ctx.fillStyle = "#ff2e7a";
+         ctx.fillRect(W/2 - 105, 362, 210, 62);
+         ctx.fillStyle = "rgba(0,0,0,.2)";
+         ctx.fillRect(W/2 - 105, 424, 210, 6);
+         ctx.fillStyle = "#fff";
+         ctx.font = "900 22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+         ctx.fillText("START", W/2 - 38, 402);
+       }
+       ctx.fillStyle = "rgba(0,0,0,.55)";
+       ctx.font = "700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+       ctx.fillText("Tap anywhere to start and flap.", 74, 460);
+       ctx.fillText("Collect 3 hearts to unlock a question.", 54, 480);
+     }
+   }
+   function onTap(x, y) {
+     if (overlay.style.display === "flex") return;
+     if (state.mode === "loading") return;
+     if (state.mode === "start") {
+       startGame();
+       bird.vy = phys.flap;
+       return;
+     }
+     if (state.mode === "play") flap();
+   }
+   window.addEventListener("pointerdown", (e) => {
+     const r = canvas.getBoundingClientRect();
+     const x = (e.clientX - r.left) * (canvas.width / r.width);
+     const y = (e.clientY - r.top) * (canvas.height / r.height);
+     onTap(x, y);
+     e.preventDefault();
+   }, { passive: false });
+   function loop() {
+     update();
+     draw();
+     requestAnimationFrame(loop);
+   }
+   async function boot() {
+     state.mode = "loading";
+     await Promise.all(Object.entries(ASSETS).map(([k, src]) => loadImage(k, src)));
+     resetToStart();
+     loop();
+   }
+   boot();
+</script>
+</body>
+</html>
