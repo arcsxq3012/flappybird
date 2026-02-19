@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#ffb7c9" />
-<title>Flappy Bird</title>
+<title>Flappy Hearts</title>
 <style>
    :root { color-scheme: light; }
    html, body { height: 100%; margin: 0; background:#ffb7c9; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
@@ -24,29 +24,38 @@
      box-shadow: 0 18px 60px rgba(0,0,0,.35);
      text-align: center;
    }
-   .title { font-size: 18px; font-weight: 800; margin: 0 0 8px; }
-   .text { margin: 0 0 12px; color: rgba(0,0,0,.85); line-height: 1.3; font-weight: 800; }
+   .title { font-size: 18px; font-weight: 900; margin: 0 0 8px; }
+   .text  { margin: 0 0 12px; color: rgba(0,0,0,.88); line-height: 1.2; font-weight: 900; font-size: 20px; }
    .row { display:flex; gap: 10px; justify-content:center; flex-wrap: wrap; }
    button {
      appearance:none; border: 0; border-radius: 12px; padding: 12px 14px;
      font-weight: 900; cursor: pointer; min-width: 120px;
    }
-   .pink { background: #ff2e7a; color: #fff; }
    .ghost { background: rgba(0,0,0,.08); color: rgba(0,0,0,.85); }
-   .noRed{ background:#ff3b30; color:#fff; }
-   .yesGreen{ background:#34c759; color:#fff; }
+   .noRed { background:#ff3b30; color:#fff; }
+   .yesGreen { background:#34c759; color:#fff; }
    .small { margin-top: 10px; font-size: 12px; color: rgba(0,0,0,.6); }
-   .drop{
-     display: inline-block;
+   .qAnim{
+     display:inline-block;
      opacity: 0;
-     transform: translateY(-22px);
-     animation: dropIn .55s ease forwards;
+     transform: translateY(-18px) scale(.98);
+     animation: qDrop .55s ease forwards, qPulse .9s ease .55s 1;
    }
-   @keyframes dropIn{
-     0%{ opacity:0; transform: translateY(-22px); }
-     70%{ opacity:1; transform: translateY(6px); }
-     100%{ opacity:1; transform: translateY(0); }
+   @keyframes qDrop{
+     0%{ opacity:0; transform: translateY(-18px) scale(.98); }
+     70%{ opacity:1; transform: translateY(7px) scale(1.02); }
+     100%{ opacity:1; transform: translateY(0) scale(1); }
    }
+   @keyframes qPulse{
+     0%{ transform: scale(1); }
+     45%{ transform: scale(1.03); }
+     100%{ transform: scale(1); }
+   }
+   /* Button sizing for the "are you sure" step */
+   .btnSmall { flex: 0 0 110px; min-width: 110px; padding: 10px 12px; }
+   .btnBig   { flex: 1 1 220px; min-width: 220px; padding: 14px 16px; }
+   /* One big green button */
+   .btnMega  { flex: 1 1 320px; min-width: 320px; padding: 16px 18px; font-size: 18px; }
 </style>
 </head>
 <body>
@@ -56,7 +65,7 @@
 <div class="overlay" id="overlay">
 <div class="card">
 <p class="title" id="ovTitle">YOU WON!</p>
-<p class="text drop" id="ovText">나랑 사귈래?</p>
+<p class="text qAnim" id="ovText">나랑 사귈래?</p>
 <div class="row" id="ovButtons">
 <button class="ghost" id="btnNext">NEXT ››</button>
 <button class="noRed" id="btnNoK">아니</button>
@@ -67,12 +76,9 @@
 </div>
 </div>
 <script>
-   // Edit these
-   const GIRL_NAME = "Lucy"; // optional
    const AFTER_YES = "Yay 💗";
    const AFTER_NO  = "Okay. No pressure.";
    const HEART_NEED = 3;
-   // Optional pixel assets (put files in /assets). If missing, it falls back to drawn shapes.
    const ASSETS = {
      bg: "assets/bg.png",
      clouds: "assets/clouds.png",
@@ -88,8 +94,8 @@
    const ovTitle = document.getElementById("ovTitle");
    const ovText = document.getElementById("ovText");
    const btnNext = document.getElementById("btnNext");
-   const btnYesK = document.getElementById("btnYesK");
-   const btnNoK  = document.getElementById("btnNoK");
+   const btnYesK = document.getElementById("btnYesK"); // green
+   const btnNoK  = document.getElementById("btnNoK");  // red
    const btnReplay = document.getElementById("btnReplay");
    const W = canvas.width, H = canvas.height;
    canvas.style.touchAction = "manipulation";
@@ -105,23 +111,14 @@
    }
    const rand = (a,b)=> a + Math.random()*(b-a);
    const state = {
-     mode: "loading", // loading | start | play | lose | win | ask | yes | no
+     mode: "loading", // loading | start | play | lose | win
      t: 0,
      score: 0,
      best: 0,
      hearts: 0
    };
-   const bird = {
-     x: 110,
-     y: H*0.45,
-     r: 12,
-     vy: 0
-   };
-   const phys = {
-     g: 0.52,
-     flap: -8.8,
-     maxFall: 12.5
-   };
+   const bird = { x: 110, y: H*0.45, r: 12, vy: 0 };
+   const phys = { g: 0.52, flap: -8.8, maxFall: 12.5 };
    const PIPE_W = 54;
    const PIPE_GAP = 160;
    const PIPE_SPACING = 190;
@@ -129,6 +126,8 @@
    const pipes = [];
    const hearts = [];
    const ground = { y: H - 64, h: 64, scroll: 0 };
+   // Ask flow
+   let rejectStep = 0; // 0: normal ask, 1: are you sure, 2: one more try
    function rectCircle(rx, ry, rw, rh, cx, cy, cr) {
      const nx = Math.max(rx, Math.min(cx, rx + rw));
      const ny = Math.max(ry, Math.min(cy, ry + rh));
@@ -159,10 +158,10 @@
      spawnSet(W + 70 + PIPE_SPACING);
      spawnSet(W + 70 + PIPE_SPACING*2);
      overlay.style.display = "none";
+     rejectStep = 0;
+     resetAskButtonsDefault();
    }
-   function startGame() {
-     state.mode = "play";
-   }
+   function startGame() { state.mode = "play"; }
    function lose() {
      if (state.mode !== "play") return;
      state.mode = "lose";
@@ -180,37 +179,82 @@
      if (state.mode !== "play") return;
      bird.vy = phys.flap;
    }
-   function restartDropAnimation() {
-     ovText.classList.remove("drop");
+   function restartQuestionAnim() {
+     ovText.classList.remove("qAnim");
      void ovText.offsetWidth;
-     ovText.classList.add("drop");
+     ovText.classList.add("qAnim");
+   }
+   function show(el, on) { el.style.display = on ? "" : "none"; }
+   function resetAskButtonsDefault() {
+     btnNoK.className = "noRed";
+     btnYesK.className = "yesGreen";
+     btnNoK.textContent = "아니";
+     btnYesK.textContent = "네";
+     btnNoK.style.flex = "";
+     btnYesK.style.flex = "";
+     btnNoK.style.minWidth = "";
+     btnYesK.style.minWidth = "";
+   }
+   function setAskStep0() {
+     rejectStep = 0;
+     ovTitle.textContent = "";
+     ovText.textContent = "나랑 사귈래?";
+     restartQuestionAnim();
+     show(btnNext, false);
+     show(btnNoK, true);
+     show(btnYesK, true);
+     show(btnReplay, false);
+     resetAskButtonsDefault();
+   }
+   function setAskStep1() {
+     rejectStep = 1;
+     ovTitle.textContent = "";
+     ovText.textContent = "Are you sure?";
+     restartQuestionAnim();
+     show(btnNext, false);
+     show(btnNoK, true);
+     show(btnYesK, true);
+     show(btnReplay, false);
+     btnNoK.textContent = "yes";
+     btnYesK.textContent = "no";
+     btnNoK.className = "noRed btnSmall";
+     btnYesK.className = "yesGreen btnBig";
+   }
+   function setAskStep2() {
+     rejectStep = 2;
+     ovTitle.textContent = "";
+     ovText.textContent = "I will give you one more try!";
+     restartQuestionAnim();
+     show(btnNext, false);
+     show(btnNoK, false);
+     show(btnYesK, true);
+     show(btnReplay, false);
+     btnYesK.textContent = "응, 사귀자";
+     btnYesK.className = "yesGreen btnMega";
    }
    function showOverlay(type) {
      overlay.style.display = "flex";
-     const show = (el, on) => el.style.display = on ? "" : "none";
-     restartDropAnimation();
      if (type === "win") {
        ovTitle.textContent = "YOU WON!";
        ovText.textContent = `SCORE ${state.score}   BEST ${state.best}`;
+       restartQuestionAnim();
        show(btnNext, true);
        show(btnNoK, false);
        show(btnYesK, false);
        show(btnReplay, true);
        btnReplay.textContent = "Play again";
+       rejectStep = 0;
+       resetAskButtonsDefault();
        return;
      }
      if (type === "ask") {
-       ovTitle.textContent = "";
-       ovText.textContent = "나랑 사귈래?";
-       show(btnNext, false);
-       show(btnNoK, true);
-       show(btnYesK, true);
-       show(btnReplay, false);
+       setAskStep0();
        return;
      }
      if (type === "yes") {
        ovTitle.textContent = "";
        ovText.textContent = AFTER_YES;
+       restartQuestionAnim();
        show(btnNext, false);
        show(btnNoK, false);
        show(btnYesK, false);
@@ -221,6 +265,7 @@
      if (type === "no") {
        ovTitle.textContent = "";
        ovText.textContent = AFTER_NO;
+       restartQuestionAnim();
        show(btnNext, false);
        show(btnNoK, false);
        show(btnYesK, false);
@@ -231,6 +276,7 @@
      if (type === "lose") {
        ovTitle.textContent = "Try again";
        ovText.textContent = `SCORE ${state.score}   HEARTS ${state.hearts}/${HEART_NEED}`;
+       restartQuestionAnim();
        show(btnNext, false);
        show(btnNoK, false);
        show(btnYesK, false);
@@ -240,8 +286,17 @@
    }
    btnReplay.addEventListener("click", () => resetToStart());
    btnNext.addEventListener("click", () => showOverlay("ask"));
-   btnYesK.addEventListener("click", () => showOverlay("yes"));
-   btnNoK.addEventListener("click", () => showOverlay("no"));
+   // Green button behavior changes by rejectStep
+   btnYesK.addEventListener("click", () => {
+     if (rejectStep === 0) { showOverlay("yes"); return; }   // 네
+     if (rejectStep === 1) { showOverlay("no"); return; }    // no
+     if (rejectStep === 2) { showOverlay("yes"); return; }   // 응, 사귀자
+   });
+   // Red button behavior changes by rejectStep
+   btnNoK.addEventListener("click", () => {
+     if (rejectStep === 0) { setAskStep1(); return; }        // 아니 -> are you sure
+     if (rejectStep === 1) { setAskStep2(); return; }        // yes -> one more try
+   });
    function drawText(x, y, text, size, color, shadow) {
      ctx.save();
      ctx.font = `900 ${size}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
@@ -309,14 +364,8 @@
    }
    function draw() {
      ctx.clearRect(0, 0, W, H);
-     // BG
-     if (img.bg) {
-       ctx.drawImage(img.bg, 0, 0, W, H);
-     } else {
-       ctx.fillStyle = "#ffc1d0";
-       ctx.fillRect(0, 0, W, H);
-     }
-     // clouds
+     if (img.bg) ctx.drawImage(img.bg, 0, 0, W, H);
+     else { ctx.fillStyle = "#ffc1d0"; ctx.fillRect(0, 0, W, H); }
      if (img.clouds) {
        ctx.globalAlpha = 0.95;
        ctx.drawImage(img.clouds, 0, 0, W, H);
@@ -326,7 +375,6 @@
        ctx.beginPath(); ctx.arc(70, H-140, 26, 0, Math.PI*2); ctx.arc(96, H-145, 30, 0, Math.PI*2); ctx.arc(128, H-140, 22, 0, Math.PI*2); ctx.fill();
        ctx.beginPath(); ctx.arc(W-90, H-170, 24, 0, Math.PI*2); ctx.arc(W-60, H-176, 30, 0, Math.PI*2); ctx.arc(W-30, H-170, 22, 0, Math.PI*2); ctx.fill();
      }
-     // pipes
      for (const p of pipes) {
        if (img.pipe) {
          ctx.drawImage(img.pipe, p.x, p.gapY, PIPE_W, ground.y - p.gapY);
@@ -344,13 +392,11 @@
          ctx.fillRect(p.x, p.gapY, PIPE_W, 10);
        }
      }
-     // hearts
      for (const h of hearts) {
        if (h.taken) continue;
        if (img.heart) ctx.drawImage(img.heart, h.x - 12, h.y - 12, 24, 24);
        else drawHeartShape(h.x, h.y, 0.8);
      }
-     // ground
      if (img.ground) {
        const y = ground.y;
        const x0 = -ground.scroll;
@@ -361,7 +407,6 @@
        ctx.fillStyle = "rgba(0,0,0,.08)";
        ctx.fillRect(0, ground.y, W, 3);
      }
-     // bird
      if (img.bird) {
        ctx.save();
        ctx.translate(bird.x, bird.y);
@@ -382,11 +427,9 @@
        ctx.beginPath(); ctx.moveTo(10,1); ctx.lineTo(18,5); ctx.lineTo(10,9); ctx.closePath(); ctx.fill();
        ctx.restore();
      }
-     // HUD hearts top-left
      ctx.fillStyle = "rgba(0,0,0,.65)";
      ctx.font = "900 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
      ctx.fillText(`${state.hearts}/${HEART_NEED} ❤`, 14, 26);
-     // start screen
      if (state.mode === "start") {
        drawText(78, 280, "FLAPPY", 36, "#ff2e7a", "rgba(0,0,0,.25)");
        drawText(88, 320, "BIRD", 36, "#ff2e7a", "rgba(0,0,0,.25)");
