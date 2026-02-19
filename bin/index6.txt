@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Flappy Bird</title>
+<style>
+@font-face{
+ font-family:"Arcade";
+ src:url("assets/arcade.ttf") format("truetype");
+ font-display:swap;
+}
+html,body{
+ height:100%;
+ margin:0;
+ background:#ffb7c9;
+ font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+.wrap{
+ height:100%;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ padding:10px;
+ box-sizing:border-box;
+}
+canvas{
+ width:min(96vw,420px);
+ height:auto;
+ border-radius:16px;
+ background:#ffb7c9;
+ box-shadow:0 16px 60px rgba(0,0,0,.28);
+ touch-action:manipulation;
+}
+/* overlay */
+.overlay{
+ position:fixed;
+ inset:0;
+ display:none;
+ align-items:center;
+ justify-content:center;
+ background:rgba(0,0,0,.45);
+ padding:18px;
+ overflow:hidden;
+}
+.card{
+ width:min(92vw,420px);
+ background:rgba(255,255,255,.92);
+ border:2px solid rgba(0,0,0,.18);
+ border-radius:14px;
+ padding:16px;
+ text-align:center;
+ position:relative;
+ z-index:2;
+}
+/* overlay fonts */
+.overlay .title,
+.overlay button{
+ font-family:"Arcade",system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+.overlay .text{
+ font-family:"Arcade",system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+/* yay screen uses normal font */
+.text.normalFont{
+ font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+}
+.title{
+ font-size:20px;
+ font-weight:900;
+ margin:0 0 8px;
+}
+.title.wonGreen{ color:#34c759; }
+.text{
+ margin:0 0 12px;
+ font-weight:900;
+ font-size:22px;
+}
+.row{
+ display:flex;
+ gap:10px;
+ justify-content:center;
+ flex-wrap:wrap;
+}
+button{
+ border:0;
+ border-radius:12px;
+ padding:12px 14px;
+ font-weight:900;
+ cursor:pointer;
+ min-width:120px;
+}
+.ghost{ background:rgba(0,0,0,.08); }
+.noRed{ background:#ff3b30;color:#fff; }
+.yesGreen{ background:#34c759;color:#fff; }
+.qAnim{
+ display:inline-block;
+ opacity:0;
+ transform:translateY(-18px) scale(.98);
+ animation:qDrop .55s ease forwards,qPulse .9s ease .55s 1;
+}
+@keyframes qDrop{
+ 0%{opacity:0;transform:translateY(-18px) scale(.98);}
+ 70%{opacity:1;transform:translateY(7px) scale(1.02);}
+ 100%{opacity:1;transform:translateY(0) scale(1);}
+}
+@keyframes qPulse{
+ 0%{transform:scale(1);}
+ 45%{transform:scale(1.03);}
+ 100%{transform:scale(1);}
+}
+/* emoji rain */
+.rainLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.dropEmoji{
+ position:absolute;
+ top:-10vh;
+ font-size:26px;
+ animation:fall linear forwards;
+}
+@keyframes fall{
+ to{transform:translateY(120vh) rotate(360deg);}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<canvas id="c" width="360" height="640"></canvas>
+</div>
+<div class="overlay" id="overlay">
+<div class="rainLayer" id="rainLayer"></div>
+<div class="card">
+<p class="title" id="ovTitle">YOU WON!</p>
+<p class="text qAnim" id="ovText"></p>
+<div class="row">
+<button class="ghost" id="btnNext">NEXT ››</button>
+<button class="noRed" id="btnNo">아니</button>
+<button class="yesGreen" id="btnYes">네</button>
+<button class="ghost" id="btnReplay">Play again</button>
+</div>
+</div>
+</div>
+<script>
+const HEART_NEED=3;
+const YAY_TEXT="Yayyy!!!";
+const RAIN=["🫶🏼","🦖","🌻"];
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
+const overlay=document.getElementById("overlay");
+const rainLayer=document.getElementById("rainLayer");
+const ovTitle=document.getElementById("ovTitle");
+const ovText=document.getElementById("ovText");
+const btnNext=document.getElementById("btnNext");
+const btnYes=document.getElementById("btnYes");
+const btnNo=document.getElementById("btnNo");
+const btnReplay=document.getElementById("btnReplay");
+let rejectStep=0;
+let rainTimer=null;
+function arcadeFont(s){
+return `900 ${s}px "Arcade",system-ui`;
+}
+function outlineText(t,x,y,size,fill,stroke,w,align="left"){
+ctx.save();
+ctx.font=arcadeFont(size);
+ctx.textAlign=align;
+ctx.lineWidth=w;
+ctx.strokeStyle=stroke;
+ctx.strokeText(t,x,y);
+ctx.fillStyle=fill;
+ctx.fillText(t,x,y);
+ctx.restore();
+}
+/* simple game state */
+const state={mode:"start",hearts:0,score:0,best:0,t:0};
+const bird={x:110,y:300,vy:0,r:12};
+function reset(){
+state.mode="start";
+state.hearts=0;
+state.score=0;
+overlay.style.display="none";
+stopRain();
+rejectStep=0;
+}
+function win(){
+state.mode="win";
+showOverlay("win");
+}
+function showOverlay(type){
+overlay.style.display="flex";
+if(type==="win"){
+ovTitle.textContent="YOU WON!";
+ovTitle.classList.add("wonGreen");
+ovText.classList.remove("normalFont");
+ovText.textContent=`SCORE ${state.score} BEST ${state.best}`;
+btnNext.style.display="";
+btnReplay.style.display="";
+btnYes.style.display="none";
+btnNo.style.display="none";
+stopRain();
+return;
+}
+if(type==="ask"){
+ovTitle.textContent="";
+ovText.classList.remove("normalFont");
+ovText.textContent="나랑 사귈래?";
+btnYes.style.display="";
+btnNo.style.display="";
+btnNext.style.display="none";
+btnReplay.style.display="none";
+return;
+}
+if(type==="yay"){
+ovTitle.textContent="";
+ovText.classList.add("normalFont");
+ovText.textContent=YAY_TEXT;
+btnYes.style.display="none";
+btnNo.style.display="none";
+btnNext.style.display="none";
+btnReplay.style.display="";
+startRain();
+}
+}
+btnNext.onclick=()=>showOverlay("ask");
+btnReplay.onclick=reset;
+btnYes.onclick=()=>showOverlay("yay");
+btnNo.onclick=()=>{
+if(rejectStep===0){rejectStep=1;ovText.textContent="Are you sure?";return;}
+if(rejectStep===1){showOverlay("yay");}
+};
+function startRain(){
+stopRain();
+const make=()=>{
+const el=document.createElement("div");
+el.className="dropEmoji";
+el.textContent=RAIN[Math.random()*RAIN.length|0];
+el.style.left=Math.random()*100+"vw";
+const d=2+Math.random()*2;
+el.style.animationDuration=d+"s";
+rainLayer.appendChild(el);
+setTimeout(()=>el.remove(),d*1000+200);
+};
+rainTimer=setInterval(()=>{for(let i=0;i<3;i++)make();},140);
+}
+function stopRain(){
+if(rainTimer)clearInterval(rainTimer);
+rainTimer=null;
+rainLayer.innerHTML="";
+}
+/* tiny fake gameplay to demo */
+window.addEventListener("pointerdown",()=>{
+if(state.mode==="start"){
+state.hearts++;
+if(state.hearts>=3)win();
+}
+});
+function draw(){
+ctx.clearRect(0,0,360,640);
+outlineText(`${state.hearts}/3 ❤`,14,26,18,"#000","#fff",4);
+if(state.mode==="start"){
+outlineText("FLAPPY",180,280,44,"#ff2e7a","#fff",6,"center");
+outlineText("BIRD",180,330,44,"#ff2e7a","#fff",6,"center");
+ctx.fillStyle="#ff2e7a";
+ctx.fillRect(75,360,210,62);
+outlineText("START",180,400,28,"#fff","#fff",0,"center");
+}
+requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
