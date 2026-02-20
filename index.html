@@ -196,20 +196,27 @@ button{
   100%{ transform:scaleY(.25); opacity:.55; }
 }
 
-/* Wrapper controls motion */
+/* Key change: wrapper has fixed "window" height, image scales to fit fully */
 .boothWrap{
   position:absolute;
   left:50%;
-  top:0;
-  width:220px;
-  transform:translateX(-50%) translateY(0) scale(1);
+  top:44px;
+  bottom:16px;
+  width:min(220px, calc(100% - 36px));
+  transform:translateX(-50%) translateY(0);
   opacity:1;
   z-index:2;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
-/* Image stays visible */
+/* Image always fully visible inside the booth */
 #boothStrip{
-  width:100%;
+  max-width:100%;
+  max-height:100%;
+  width:auto;
   height:auto;
   display:block;
   border-radius:12px;
@@ -218,36 +225,28 @@ button{
     0 22px 55px rgba(0,0,0,.10);
 }
 
-/* 3.2s print */
+/* 3.2s print animation */
 .boothWrap.boothPrint{
   animation:boothPrint 3.2s cubic-bezier(.18,.85,.25,1) forwards;
 }
 
 @keyframes boothPrint{
-  0%{
-    transform:translateX(-50%) translateY(-140%) scale(.96);
-    opacity:0;
-  }
+  0%{ transform:translateX(-50%) translateY(-120%); opacity:0; }
   20%{ opacity:1; }
-  70%{ transform:translateX(-50%) translateY(-8%) scale(1.01); }
-  88%{ transform:translateX(-50%) translateY(0) scale(.995); }
-  100%{
-    transform:translateX(-50%) translateY(0) scale(1);
-    opacity:1;
-  }
+  70%{ transform:translateX(-50%) translateY(-8%); }
+  100%{ transform:translateX(-50%) translateY(0); opacity:1; }
 }
 
-/* shake after print */
 .boothWrap.boothShake{
   animation:polaroidShake .55s ease-in-out 1;
 }
 
 @keyframes polaroidShake{
-  0%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
-  18%{ transform:translateX(-50%) translateY(-2px) rotate(-1.2deg) scale(1); }
-  38%{ transform:translateX(-50%) translateY(1px) rotate(1.1deg) scale(1); }
-  60%{ transform:translateX(-50%) translateY(-1px) rotate(-0.8deg) scale(1); }
-  100%{ transform:translateX(-50%) translateY(0) rotate(0deg) scale(1); }
+  0%{ transform:translateX(-50%) translateY(0) rotate(0deg); }
+  18%{ transform:translateX(-50%) translateY(-2px) rotate(-1.2deg); }
+  38%{ transform:translateX(-50%) translateY(1px) rotate(1.1deg); }
+  60%{ transform:translateX(-50%) translateY(-1px) rotate(-0.8deg); }
+  100%{ transform:translateX(-50%) translateY(0) rotate(0deg); }
 }
 
 .boothActions{
@@ -523,8 +522,6 @@ function hideBoothAll(){
   booth.style.display = "none";
   boothSlot.classList.remove("open");
   boothWrap.classList.remove("boothPrint","boothShake");
-  boothWrap.style.width = "220px";
-  boothWrap.style.top = "0px";
   boothMsg.textContent = "";
   boothMsg.classList.remove("show");
   shareHint.style.display = "none";
@@ -653,39 +650,11 @@ function setAskStep2(){
   btnYes.className = "yesGreen btnMega";
 }
 
-/* Fit strip fully inside the booth */
-function sizeStripToFitBooth(){
-  if (!boothStrip.naturalWidth || !boothStrip.naturalHeight) return;
-
-  const slotW = boothSlot.clientWidth;
-  const slotH = boothSlot.clientHeight;
-
-  const padX = 18;
-  const padTop = 46;
-  const padBottom = 18;
-
-  const availW = Math.max(80, slotW - padX * 2);
-  const availH = Math.max(80, slotH - padTop - padBottom);
-
-  const aspect = boothStrip.naturalHeight / boothStrip.naturalWidth;
-
-  let wFromH = availH / aspect;
-  let w = Math.min(availW, wFromH);
-  w = Math.max(120, w);
-
-  const h = w * aspect;
-
-  boothWrap.style.width = w + "px";
-  boothWrap.style.top = Math.max(padTop, Math.round((slotH - h) / 2)) + "px";
-}
-
 function runPhotoBooth(){
   booth.style.display = "";
 
   boothSlot.classList.remove("open");
   boothWrap.classList.remove("boothPrint","boothShake");
-
-  sizeStripToFitBooth();
 
   void boothWrap.offsetWidth;
 
@@ -1056,14 +1025,6 @@ async function boot(){
     await document.fonts.load('16px "Arcade"');
     await document.fonts.load('44px "Arcade"');
   }
-
-  boothStrip.addEventListener("load", () => {
-    if (booth.style.display !== "none") sizeStripToFitBooth();
-  });
-
-  window.addEventListener("resize", () => {
-    if (booth.style.display !== "none") sizeStripToFitBooth();
-  });
 
   resetToStart();
   requestAnimationFrame(loop);
